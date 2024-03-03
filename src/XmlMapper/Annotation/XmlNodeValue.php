@@ -22,6 +22,7 @@ use Doctrine\Common\Annotations\Annotation;
  * @link    https://github.com/magicsunday/xmlmapper/
  *
  * @Annotation
+ *
  * @Target({"PROPERTY"})
  */
 final class XmlNodeValue extends Annotation

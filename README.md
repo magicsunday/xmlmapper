@@ -1,9 +1,6 @@
 [![Latest version](https://img.shields.io/github/v/release/magicsunday/xmlmapper?sort=semver)](https://github.com/magicsunday/xmlmapper/releases/latest)
 [![License](https://img.shields.io/github/license/magicsunday/xmlmapper)](https://github.com/magicsunday/xmlmapper/blob/main/LICENSE)
-[![PHPStan](https://github.com/magicsunday/xmlmapper/actions/workflows/phpstan.yml/badge.svg)](https://github.com/magicsunday/xmlmapper/actions/workflows/phpstan.yml)
-[![PHPCodeSniffer](https://github.com/magicsunday/xmlmapper/actions/workflows/phpcs.yml/badge.svg)](https://github.com/magicsunday/xmlmapper/actions/workflows/phpcs.yml)
-[![PHPUnit](https://github.com/magicsunday/xmlmapper/actions/workflows/phpunit.yml/badge.svg)](https://github.com/magicsunday/xmlmapper/actions/workflows/phpunit.yml)
-
+[![CI](https://github.com/magicsunday/xmlmapper/actions/workflows/ci.yml/badge.svg)](https://github.com/magicsunday/xmlmapper/actions/workflows/ci.yml)
 
 # XmlMapper
 This module provides a mapper to map PHP classes to XML utilizing Symfony's property info and access packages.
@@ -28,7 +25,10 @@ composer remove magicsunday/xmlmapper
 ### Testing
 ```bash
 composer update
-vendor/bin/phpcs ./src --standard=PSR12
-vendor/bin/phpstan analyse -c phpstan.neon
-vendor/bin/phpunit
+composer ci:cgl
+composer ci:test
+composer ci:test:php:phplint
+composer ci:test:php:phpstan
+composer ci:test:php:rector
+composer ci:test:php:unit
 ```
