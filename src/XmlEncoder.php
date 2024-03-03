@@ -29,7 +29,7 @@ use function array_key_exists;
 use function is_bool;
 
 /**
- * XmlEncoder
+ * XmlEncoder.
  *
  * @author  Rico Sonntag <mail@ricosonntag.de>
  * @license https://opensource.org/licenses/MIT
@@ -62,7 +62,7 @@ class XmlEncoder
     /**
      * The property name converter instance.
      *
-     * @var null|PropertyNameConverterInterface
+     * @var PropertyNameConverterInterface|null
      */
     protected ?PropertyNameConverterInterface $nameConverter;
 
@@ -77,11 +77,11 @@ class XmlEncoder
      * XmlEncoder constructor.
      *
      * @param PropertyInfoExtractorInterface      $extractor
-     * @param null|PropertyNameConverterInterface $nameConverter A name converter instance
+     * @param PropertyNameConverterInterface|null $nameConverter A name converter instance
      */
     public function __construct(
         PropertyInfoExtractorInterface $extractor,
-        PropertyNameConverterInterface $nameConverter = null,
+        ?PropertyNameConverterInterface $nameConverter = null,
     ) {
         $this->xml = new XMLWriter();
         $this->xml->openMemory();
@@ -105,6 +105,7 @@ class XmlEncoder
     public function addType(string $type, Closure $closure): XmlEncoder
     {
         $this->types[$type] = $closure;
+
         return $this;
     }
 
@@ -119,7 +120,7 @@ class XmlEncoder
     {
         $rootElementName = $this->getClassShortName($instance);
 
-        if ($this->nameConverter) {
+        if ($this->nameConverter instanceof PropertyNameConverterInterface) {
             $rootElementName = $this->nameConverter->convert($rootElementName);
         }
 
@@ -172,11 +173,9 @@ class XmlEncoder
             }
 
             // Convert property name according name converter
-            if ($this->nameConverter) {
-                $xmlPropertyName = $this->nameConverter->convert($propertyName);
-            } else {
-                $xmlPropertyName = $propertyName;
-            }
+            $xmlPropertyName = $this->nameConverter instanceof PropertyNameConverterInterface
+                ? $this->nameConverter->convert($propertyName)
+                : $propertyName;
 
             // Process attributes
             if ($this->isXmlAttributeAnnotation($className, $propertyName)) {
@@ -228,12 +227,7 @@ class XmlEncoder
      */
     private function getCollectionValueType(Type $type): Type
     {
-        // BC for symfony < 5.3
-        if (!method_exists($type, 'getCollectionValueTypes')) {
-            $collectionValueType = $type->getCollectionValueType();
-        } else {
-            $collectionValueType = $type->getCollectionValueTypes()[0] ?? null;
-        }
+        $collectionValueType = $type->getCollectionValueTypes()[0] ?? null;
 
         return $collectionValueType ?? $this->defaultType;
     }
@@ -273,7 +267,7 @@ class XmlEncoder
     }
 
     /**
-     * Returns TRUE if the property has the given annotation
+     * Returns TRUE if the property has the given annotation.
      *
      * @param class-string $className      The class name of the initial element
      * @param string       $propertyName   The name of the property
@@ -300,20 +294,18 @@ class XmlEncoder
      * @param class-string $className    The class name of the initial element
      * @param string       $propertyName The name of the property
      *
-     * @return Annotation[]
+     * @return Annotation[]|object[]
      */
     private function extractPropertyAnnotations(string $className, string $propertyName): array
     {
         $reflectionProperty = $this->getReflectionProperty($className, $propertyName);
-        $annotations        = [];
 
-        if ($reflectionProperty) {
-            /** @var Annotation[] $annotations */
-            $annotations = (new AnnotationReader())
+        if ($reflectionProperty instanceof ReflectionProperty) {
+            return (new AnnotationReader())
                 ->getPropertyAnnotations($reflectionProperty);
         }
 
-        return $annotations;
+        return [];
     }
 
     /**
@@ -322,7 +314,7 @@ class XmlEncoder
      * @param class-string $className    The class name of the initial element
      * @param string       $propertyName The name of the property
      *
-     * @return null|ReflectionProperty
+     * @return ReflectionProperty|null
      */
     private function getReflectionProperty(string $className, string $propertyName): ?ReflectionProperty
     {
@@ -418,11 +410,7 @@ class XmlEncoder
      */
     private function encodeValue(mixed $propertyValue): string
     {
-        if (is_bool($propertyValue)) {
-            $value = (int) $propertyValue;
-        } else {
-            $value = $propertyValue;
-        }
+        $value = is_bool($propertyValue) ? (int) $propertyValue : $propertyValue;
 
         return (string) $value;
     }
@@ -475,6 +463,7 @@ class XmlEncoder
     private function callCustomClosure(string $propertyName, mixed $propertyValue, string $typeName): mixed
     {
         $callback = $this->types[$typeName];
+
         return $callback($propertyName, $propertyValue);
     }
 }

@@ -4,16 +4,17 @@
          colors="true"
          columns="max"
          stderr="true"
-         bootstrap="./vendor/autoload.php"
-         cacheDirectory=".phpunit.cache">
-    <source>
-        <include>
-            <directory suffix=".php">./src</directory>
-        </include>
-    </source>
+         bootstrap="./.build/vendor/autoload.php"
+         cacheDirectory=".phpunit.cache"
+>
     <testsuites>
         <testsuite name="Integration Tests">
             <directory>./test</directory>
         </testsuite>
     </testsuites>
+    <source>
+        <include>
+            <directory>./src</directory>
+        </include>
+    </source>
 </phpunit>

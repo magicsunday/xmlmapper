@@ -19,7 +19,7 @@ use Symfony\Component\PropertyInfo\Extractor\ReflectionExtractor;
 use Symfony\Component\PropertyInfo\PropertyInfoExtractor;
 
 /**
- * Class XmlMapperTest
+ * Class XmlMapperTest.
  *
  * @author  Rico Sonntag <mail@ricosonntag.de>
  * @license https://opensource.org/licenses/MIT
@@ -36,8 +36,8 @@ class TestCase extends \PHPUnit\Framework\TestCase
      */
     protected function getXmlEncoder(array $classMap = []): XmlEncoder
     {
-        $listExtractors = [ new ReflectionExtractor() ];
-        $typeExtractors = [ new PhpDocExtractor() ];
+        $listExtractors = [new ReflectionExtractor()];
+        $typeExtractors = [new PhpDocExtractor()];
         $extractor      = new PropertyInfoExtractor($listExtractors, $typeExtractors);
 
         return new XmlEncoder(
