@@ -14,7 +14,11 @@ namespace MagicSunday;
 use Closure;
 use Doctrine\Common\Annotations\Annotation;
 use Doctrine\Common\Annotations\AnnotationReader;
+use DOMDocument;
+use DOMElement;
+use DOMException;
 use MagicSunday\XmlMapper\Annotation\XmlAttribute;
+use MagicSunday\XmlMapper\Annotation\XmlCDataSection;
 use MagicSunday\XmlMapper\Annotation\XmlNodeValue;
 use MagicSunday\XmlMapper\Converter\PropertyNameConverterInterface;
 use ReflectionClass;
@@ -23,7 +27,6 @@ use ReflectionObject;
 use ReflectionProperty;
 use Symfony\Component\PropertyInfo\PropertyInfoExtractorInterface;
 use Symfony\Component\PropertyInfo\Type;
-use XMLWriter;
 
 use function array_key_exists;
 use function is_bool;
@@ -43,9 +46,9 @@ class XmlEncoder
     /**
      * XMLWriter instance.
      *
-     * @var XMLWriter
+     * @var DOMDocument
      */
-    private XMLWriter $xml;
+    private DOMDocument $domDocument;
 
     /**
      * The default type instance.
@@ -83,11 +86,9 @@ class XmlEncoder
         PropertyInfoExtractorInterface $extractor,
         ?PropertyNameConverterInterface $nameConverter = null,
     ) {
-        $this->xml = new XMLWriter();
-        $this->xml->openMemory();
-        $this->xml->setIndent(true);
-        $this->xml->setIndentString('    ');
-        $this->xml->startDocument('1.0', 'UTF-8');
+        $this->domDocument                = new DOMDocument('1.0', 'UTF-8');
+        $this->domDocument->xmlStandalone = false;
+        $this->domDocument->formatOutput  = true;
 
         $this->defaultType   = new Type(Type::BUILTIN_TYPE_STRING);
         $this->extractor     = $extractor;
@@ -114,9 +115,11 @@ class XmlEncoder
      *
      * @param XmlSerializable $instance
      *
-     * @return string
+     * @return string|false the XML, or false if an error occurred
+     *
+     * @throws DOMException
      */
-    public function map(XmlSerializable $instance): string
+    public function map(XmlSerializable $instance): string|false
     {
         $rootElementName = $this->getClassShortName($instance);
 
@@ -126,22 +129,24 @@ class XmlEncoder
 
         // Encode given object instance. Set the short name of class as surrounding XML tag
         $this->encodeObject(
+            null,
             $rootElementName,
             $instance
         );
 
-        $this->xml->endDocument();
-
-        return $this->xml->outputMemory();
+        return $this->domDocument->saveXML();
     }
 
     /**
      * Recursively encodes the given class and its properties to XML. Ignores all
      * properties with a "null" value. Encodes each internal type to string.
      *
+     * @param DOMElement      $domElement
      * @param XmlSerializable $instance
+     *
+     * @throws DOMException
      */
-    private function encodeElement(XmlSerializable $instance): void
+    private function encodeElement(DOMElement $domElement, XmlSerializable $instance): void
     {
         /** @var class-string<TEntity> $className */
         $className  = $this->getClassName($instance);
@@ -179,8 +184,8 @@ class XmlEncoder
 
             // Process attributes
             if ($this->isXmlAttributeAnnotation($className, $propertyName)) {
-                $this->xml
-                    ->writeAttribute(
+                $domElement
+                    ->setAttribute(
                         $xmlPropertyName,
                         $this->encodeValue($propertyValue)
                     );
@@ -188,11 +193,25 @@ class XmlEncoder
                 continue;
             }
 
+            // Process CDATA section
+            if ($this->isXmlCDataSectionAnnotation($className, $propertyName)) {
+                $domElement
+                    ->appendChild(
+                        $this->domDocument->createCDATASection(
+                            $this->encodeValue($propertyValue)
+                        )
+                    );
+
+                continue;
+            }
+
             // Process raw text node
             if ($this->isXmlNodeValueAnnotation($className, $propertyName)) {
-                $this->xml
-                    ->writeRaw(
-                        $this->encodeValue($propertyValue)
+                $domElement
+                    ->appendChild(
+                        $this->domDocument->createTextNode(
+                            $this->encodeValue($propertyValue)
+                        )
                     );
 
                 continue;
@@ -201,6 +220,7 @@ class XmlEncoder
             // Process collections
             if ($propertyType->isCollection()) {
                 $this->encodeCollection(
+                    $domElement,
                     $this->getCollectionValueType($propertyType),
                     $xmlPropertyName,
                     $propertyValue
@@ -211,6 +231,7 @@ class XmlEncoder
 
             // Process any other data
             $this->encodeObjectOrScalar(
+                $domElement,
                 $propertyType,
                 $xmlPropertyName,
                 $propertyValue
@@ -263,6 +284,23 @@ class XmlEncoder
             $className,
             $propertyName,
             XmlNodeValue::class
+        );
+    }
+
+    /**
+     * Returns TRUE if the property contains an "XmlCDataSection" annotation.
+     *
+     * @param class-string $className    The class name of the initial element
+     * @param string       $propertyName The name of the property
+     *
+     * @return bool
+     */
+    private function isXmlCDataSectionAnnotation(string $className, string $propertyName): bool
+    {
+        return $this->hasPropertyAnnotation(
+            $className,
+            $propertyName,
+            XmlCDataSection::class
         );
     }
 
@@ -356,12 +394,14 @@ class XmlEncoder
      * @param Type   $type   The type value object
      * @param string $name   The XML node name
      * @param mixed  $values The collection values to encode to the XML
+     *
+     * @throws DOMException
      */
-    private function encodeCollection(Type $type, string $name, $values): void
+    private function encodeCollection(DOMElement $parent, Type $type, string $name, mixed $values): void
     {
         // Process all entries in the collection
         foreach ($values as $value) {
-            $this->encodeObjectOrScalar($type, $name, $value);
+            $this->encodeObjectOrScalar($parent, $type, $name, $value);
         }
     }
 
@@ -371,16 +411,20 @@ class XmlEncoder
      * @param Type   $type  The type value object
      * @param string $name  The XML node name
      * @param mixed  $value The XML node value
+     *
+     * @throws DOMException
      */
-    private function encodeObjectOrScalar(Type $type, string $name, mixed $value): void
+    private function encodeObjectOrScalar(DOMElement $parent, Type $type, string $name, mixed $value): void
     {
         if ($type->getBuiltinType() === Type::BUILTIN_TYPE_OBJECT) {
-            $this->encodeObject($name, $value);
+            $this->encodeObject($parent, $name, $value);
         } else {
             // Write encoded value directly into XML output
-            $this->xml->writeElement(
-                $name,
-                $this->encodeValue($value)
+            $parent->appendChild(
+                $this->domDocument->createElement(
+                    $name,
+                    $this->encodeValue($value)
+                )
             );
         }
     }
@@ -388,17 +432,24 @@ class XmlEncoder
     /**
      * Encodes an object into XML.
      *
-     * @param string          $name  The XML node name
-     * @param XmlSerializable $value The XML node value
+     * @param DOMElement|null $parent If NULL the newly created element is added directly to the document
+     * @param string          $name   The XML node name
+     * @param XmlSerializable $value  The XML node value
+     *
+     * @throws DOMException
      */
-    private function encodeObject(string $name, XmlSerializable $value): void
+    private function encodeObject(?DOMElement $parent, string $name, XmlSerializable $value): void
     {
-        $this->xml->startElement($name);
+        $node = $this->domDocument->createElement($name);
 
         // Encode object and its properties
-        $this->encodeElement($value);
+        $this->encodeElement($node, $value);
 
-        $this->xml->endElement();
+        if ($parent instanceof DOMElement) {
+            $parent->appendChild($node);
+        } else {
+            $this->domDocument->appendChild($node);
+        }
     }
 
     /**
