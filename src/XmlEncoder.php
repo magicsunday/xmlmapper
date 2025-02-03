@@ -417,6 +417,7 @@ class XmlEncoder
     private function encodeObjectOrScalar(DOMElement $parent, Type $type, string $name, mixed $value): void
     {
         if ($type->getBuiltinType() === Type::BUILTIN_TYPE_OBJECT) {
+            /** @var XmlSerializable $value */
             $this->encodeObject($parent, $name, $value);
         } else {
             // Write encoded value directly into XML output
