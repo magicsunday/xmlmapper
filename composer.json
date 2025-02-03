@@ -14,7 +14,7 @@
         "issues": "https://github.com/magicsunday/xmlmapper/issues"
     },
     "require": {
-        "php": ">=8.1.0 <8.5.0",
+        "php": ">=8.2.0 <8.5.0",
         "ext-xml": "*",
         "ext-dom": "*",
         "symfony/property-info": "^6.0 || ^7.0",
