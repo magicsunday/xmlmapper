@@ -11,7 +11,6 @@ declare(strict_types=1);
 
 namespace MagicSunday\Test;
 
-use Closure;
 use MagicSunday\XmlEncoder;
 use MagicSunday\XmlMapper\Converter\CamelCasePropertyNameConverter;
 use Symfony\Component\PropertyInfo\Extractor\PhpDocExtractor;
@@ -30,11 +29,9 @@ class TestCase extends \PHPUnit\Framework\TestCase
     /**
      * Returns an instance of the XmlEncoder for testing.
      *
-     * @param string[]|Closure[] $classMap
-     *
      * @return XmlEncoder
      */
-    protected function getXmlEncoder(array $classMap = []): XmlEncoder
+    protected function getXmlEncoder(): XmlEncoder
     {
         $listExtractors = [new ReflectionExtractor()];
         $typeExtractors = [new PhpDocExtractor()];
