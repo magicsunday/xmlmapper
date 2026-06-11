@@ -270,6 +270,24 @@ class XmlEncoderTest extends TestCase
     }
 
     /**
+     * A union or intersection type has no single builtin name, so a custom type
+     * closure for such a property is dispatched through the "string" key rather
+     * than a member type. This pins the dispatch key for composite-typed
+     * properties.
+     */
+    #[Test]
+    public function appliesCustomTypeClosureToUnionTypedPropertyViaStringKey(): void
+    {
+        $encoder = $this->getXmlEncoder();
+        $encoder->addType('string', static fn (string $name, mixed $value): string => 'wrapped:' . $value);
+
+        self::assertXmlStringEqualsXmlString(
+            '<?xml version="1.0" encoding="UTF-8"?><unionProperty><code>wrapped:7</code></unionProperty>',
+            $encoder->map(new UnionProperty())
+        );
+    }
+
+    /**
      * A collection whose value type is a union of object types encodes every
      * entry recursively as an object, because the object-versus-scalar decision
      * is made from each runtime value rather than the union type (which cannot
