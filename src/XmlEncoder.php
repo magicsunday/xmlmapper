@@ -25,6 +25,7 @@ use ReflectionClass;
 use ReflectionException;
 use ReflectionObject;
 use ReflectionProperty;
+use Stringable;
 use Symfony\Component\PropertyInfo\PropertyInfoExtractorInterface;
 use Symfony\Component\TypeInfo\Type;
 use Symfony\Component\TypeInfo\Type\BuiltinType;
@@ -35,6 +36,8 @@ use Symfony\Component\TypeInfo\TypeIdentifier;
 
 use function array_key_exists;
 use function is_bool;
+use function is_iterable;
+use function is_scalar;
 
 /**
  * XmlEncoder.
@@ -106,7 +109,7 @@ class XmlEncoder
      * @param string  $type    The type name
      * @param Closure $closure The closure to execute for the defined type
      *
-     * @return XmlEncoder
+     * @return $this
      */
     public function addType(string $type, Closure $closure): XmlEncoder
     {
@@ -449,6 +452,10 @@ class XmlEncoder
      */
     private function encodeCollection(DOMElement $parent, string $name, mixed $values): void
     {
+        if (!is_iterable($values)) {
+            return;
+        }
+
         // Process all entries in the collection
         foreach ($values as $value) {
             $this->encodeObjectOrScalar($parent, $name, $value);
@@ -505,7 +512,9 @@ class XmlEncoder
     }
 
     /**
-     * Encodes the given value to a string.
+     * Encodes the given scalar value to its string representation. Booleans are
+     * rendered as their integer value; anything that is neither scalar nor
+     * Stringable yields an empty string.
      *
      * @param mixed $propertyValue
      *
@@ -513,9 +522,15 @@ class XmlEncoder
      */
     private function encodeValue(mixed $propertyValue): string
     {
-        $value = is_bool($propertyValue) ? (int) $propertyValue : $propertyValue;
+        if (is_bool($propertyValue)) {
+            return (string) (int) $propertyValue;
+        }
 
-        return (string) $value;
+        if (is_scalar($propertyValue) || ($propertyValue instanceof Stringable)) {
+            return (string) $propertyValue;
+        }
+
+        return '';
     }
 
     /**
