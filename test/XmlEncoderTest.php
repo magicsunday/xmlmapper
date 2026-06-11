@@ -18,6 +18,7 @@ use MagicSunday\Test\Fixture\Comment;
 use MagicSunday\Test\Fixture\CustomTypeHost;
 use MagicSunday\Test\Fixture\Person;
 use MagicSunday\Test\Fixture\Price;
+use MagicSunday\Test\Fixture\UnionProperty;
 use MagicSunday\XmlEncoder;
 use MagicSunday\XmlMapper\Annotation\XmlAttribute;
 use MagicSunday\XmlMapper\Annotation\XmlCDataSection;
@@ -26,6 +27,9 @@ use MagicSunday\XmlMapper\Converter\CamelCasePropertyNameConverter;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\Attributes\UsesClass;
+use Symfony\Component\PropertyInfo\Extractor\PhpDocExtractor;
+use Symfony\Component\PropertyInfo\Extractor\ReflectionExtractor;
+use Symfony\Component\PropertyInfo\PropertyInfoExtractor;
 
 /**
  * Behavioural characterization tests pinning the XML output produced by the encoder.
@@ -211,5 +215,41 @@ class XmlEncoderTest extends TestCase
 
         self::assertStringContainsString('<labels>draft</labels>', $xml);
         self::assertStringContainsString('<labels>review</labels>', $xml);
+    }
+
+    /**
+     * Without a name converter the raw class and property names are used verbatim
+     * as element names.
+     */
+    #[Test]
+    public function encodesWithoutNameConverter(): void
+    {
+        $extractor = new PropertyInfoExtractor([new ReflectionExtractor()], [new PhpDocExtractor()]);
+        $encoder   = new XmlEncoder($extractor);
+
+        self::assertXmlStringEqualsXmlString(
+            <<<'XML'
+                <?xml version="1.0" encoding="UTF-8"?>
+                <Person>
+                    <firstName>John</firstName>
+                    <home_town>Berlin</home_town>
+                    <age>42</age>
+                    <active>1</active>
+                </Person>
+                XML,
+            $encoder->map(new Person())
+        );
+    }
+
+    /**
+     * A union-typed property has no single builtin type and is encoded through the
+     * scalar fallback path.
+     */
+    #[Test]
+    public function encodesUnionTypedPropertyAsScalar(): void
+    {
+        $xml = (string) $this->getXmlEncoder()->map(new UnionProperty());
+
+        self::assertStringContainsString('<code>7</code>', $xml);
     }
 }
