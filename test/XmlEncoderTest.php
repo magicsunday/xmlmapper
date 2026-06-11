@@ -18,6 +18,7 @@ use MagicSunday\Test\Fixture\Comment;
 use MagicSunday\Test\Fixture\CustomTypeHost;
 use MagicSunday\Test\Fixture\NativeCData;
 use MagicSunday\Test\Fixture\NativeMarkers;
+use MagicSunday\Test\Fixture\NativeWithForeignDocblock;
 use MagicSunday\Test\Fixture\Person;
 use MagicSunday\Test\Fixture\Price;
 use MagicSunday\Test\Fixture\UnionObjectHost;
@@ -169,6 +170,22 @@ class XmlEncoderTest extends TestCase
         $xml = (string) $this->getXmlEncoder()->map(new NativeCData());
 
         self::assertStringContainsString('<nativeCData><![CDATA[<b>hi</b>]]></nativeCData>', $xml);
+    }
+
+    /**
+     * A property that uses a native marker and additionally carries an unrelated,
+     * unimported docblock annotation is encoded without failing, regardless of
+     * which marker is queried first.
+     */
+    #[Test]
+    public function encodesNativeMarkerAlongsideForeignDocblockAnnotation(): void
+    {
+        $xml = (string) $this->getXmlEncoder()->map(new NativeWithForeignDocblock());
+
+        self::assertStringContainsString(
+            '<nativeWithForeignDocblock><![CDATA[<b>hi</b>]]></nativeWithForeignDocblock>',
+            $xml
+        );
     }
 
     /**
