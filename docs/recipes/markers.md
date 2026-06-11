@@ -13,6 +13,11 @@ native syntax incrementally.
 
 All three target a property.
 
+> The example outputs below assume an encoder wired with the
+> `CamelCasePropertyNameConverter` (as in the [quick start](../../README.md)), which
+> is why the root and element names are lower/camelCased. Without a name converter
+> the raw class name is used (e.g. `<Price>` instead of `<price>`).
+
 ## Attribute and node value
 
 ```php
