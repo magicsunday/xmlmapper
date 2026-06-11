@@ -12,7 +12,6 @@ declare(strict_types=1);
 namespace MagicSunday;
 
 use Closure;
-use Doctrine\Common\Annotations\Annotation;
 use Doctrine\Common\Annotations\AnnotationReader;
 use DOMDocument;
 use DOMElement;
@@ -21,6 +20,7 @@ use MagicSunday\XmlMapper\Annotation\XmlAttribute;
 use MagicSunday\XmlMapper\Annotation\XmlCDataSection;
 use MagicSunday\XmlMapper\Annotation\XmlNodeValue;
 use MagicSunday\XmlMapper\Converter\PropertyNameConverterInterface;
+use ReflectionAttribute;
 use ReflectionClass;
 use ReflectionException;
 use ReflectionObject;
@@ -359,45 +359,37 @@ class XmlEncoder
     }
 
     /**
-     * Returns TRUE if the property has the given annotation.
+     * Returns TRUE if the property carries the given marker, applied either as a
+     * native PHP attribute (#[XmlAttribute]) or as a Doctrine docblock annotation
+     * (@XmlAttribute).
      *
      * @param class-string $className      The class name of the initial element
      * @param string       $propertyName   The name of the property
-     * @param string       $annotationName The name of the property annotation
+     * @param class-string $annotationName The name of the property annotation
      *
      * @return bool
      */
     private function hasPropertyAnnotation(string $className, string $propertyName, string $annotationName): bool
     {
-        $annotations = $this->extractPropertyAnnotations($className, $propertyName);
+        $reflectionProperty = $this->getReflectionProperty($className, $propertyName);
 
-        foreach ($annotations as $annotation) {
+        if (!$reflectionProperty instanceof ReflectionProperty) {
+            return false;
+        }
+
+        // Native PHP attribute syntax
+        if ($reflectionProperty->getAttributes($annotationName, ReflectionAttribute::IS_INSTANCEOF) !== []) {
+            return true;
+        }
+
+        // Doctrine docblock annotation syntax
+        foreach ((new AnnotationReader())->getPropertyAnnotations($reflectionProperty) as $annotation) {
             if ($annotation instanceof $annotationName) {
                 return true;
             }
         }
 
         return false;
-    }
-
-    /**
-     * Extracts possible property annotations.
-     *
-     * @param class-string $className    The class name of the initial element
-     * @param string       $propertyName The name of the property
-     *
-     * @return Annotation[]|object[]
-     */
-    private function extractPropertyAnnotations(string $className, string $propertyName): array
-    {
-        $reflectionProperty = $this->getReflectionProperty($className, $propertyName);
-
-        if ($reflectionProperty instanceof ReflectionProperty) {
-            return (new AnnotationReader())
-                ->getPropertyAnnotations($reflectionProperty);
-        }
-
-        return [];
     }
 
     /**

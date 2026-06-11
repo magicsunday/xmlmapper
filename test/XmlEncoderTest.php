@@ -16,6 +16,8 @@ use MagicSunday\Test\Fixture\Book;
 use MagicSunday\Test\Fixture\Chapter;
 use MagicSunday\Test\Fixture\Comment;
 use MagicSunday\Test\Fixture\CustomTypeHost;
+use MagicSunday\Test\Fixture\NativeCData;
+use MagicSunday\Test\Fixture\NativeMarkers;
 use MagicSunday\Test\Fixture\Person;
 use MagicSunday\Test\Fixture\Price;
 use MagicSunday\Test\Fixture\UnionObjectHost;
@@ -141,6 +143,32 @@ class XmlEncoderTest extends TestCase
         $xml = (string) $this->getXmlEncoder()->map(new Comment());
 
         self::assertStringContainsString('<comment><![CDATA[<b>hi</b>]]></comment>', $xml);
+    }
+
+    /**
+     * The XmlAttribute and XmlNodeValue markers are also recognised when applied
+     * with the native PHP 8 attribute syntax, producing the same output as the
+     * Doctrine docblock annotation.
+     */
+    #[Test]
+    public function encodesNativeAttributeAndNodeValueMarkers(): void
+    {
+        self::assertXmlStringEqualsXmlString(
+            '<?xml version="1.0" encoding="UTF-8"?><nativeMarkers currency="EUR">42.00</nativeMarkers>',
+            $this->getXmlEncoder()->map(new NativeMarkers())
+        );
+    }
+
+    /**
+     * The XmlCDataSection marker is also recognised when applied with the native
+     * PHP 8 attribute syntax.
+     */
+    #[Test]
+    public function encodesNativeCDataSectionMarker(): void
+    {
+        $xml = (string) $this->getXmlEncoder()->map(new NativeCData());
+
+        self::assertStringContainsString('<nativeCData><![CDATA[<b>hi</b>]]></nativeCData>', $xml);
     }
 
     /**
