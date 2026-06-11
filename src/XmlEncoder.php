@@ -103,6 +103,13 @@ class XmlEncoder
     private ?AnnotationReader $annotationReader = null;
 
     /**
+     * The resolved marker annotations memoised per "class::property" key.
+     *
+     * @var array<string, array<class-string, bool>>
+     */
+    private array $markerCache = [];
+
+    /**
      * XmlEncoder constructor.
      *
      * @param PropertyInfoExtractorInterface      $extractor
@@ -388,55 +395,71 @@ class XmlEncoder
      */
     private function hasPropertyAnnotation(string $className, string $propertyName, string $annotationName): bool
     {
+        return $this->resolvePropertyMarkers($className, $propertyName)[$annotationName] ?? false;
+    }
+
+    /**
+     * Resolves which marker annotations a property carries and memoises the result
+     * per "class::property" key, so the reflection lookup and the docblock parse
+     * run once per property rather than once per marker check per encoded object.
+     *
+     * A property that opts into the native attribute syntax for any marker is not
+     * read from the docblock: this keeps an unrelated foreign docblock annotation
+     * from breaking an already-natively-annotated property, while a genuinely
+     * fumbled docblock marker (e.g. a forgotten use import) on a docblock-only
+     * property still fails loudly.
+     *
+     * @param class-string $className    The class name of the initial element
+     * @param string       $propertyName The name of the property
+     *
+     * @return array<class-string, bool>
+     */
+    private function resolvePropertyMarkers(string $className, string $propertyName): array
+    {
+        $cacheKey = $className . '::' . $propertyName;
+
+        if (isset($this->markerCache[$cacheKey])) {
+            return $this->markerCache[$cacheKey];
+        }
+
+        $markers = [
+            XmlAttribute::class    => false,
+            XmlNodeValue::class    => false,
+            XmlCDataSection::class => false,
+        ];
+
         $reflectionProperty = $this->getReflectionProperty($className, $propertyName);
 
         if (!$reflectionProperty instanceof ReflectionProperty) {
-            return false;
+            return $this->markerCache[$cacheKey] = $markers;
         }
 
         // Native PHP attribute syntax
-        if ($reflectionProperty->getAttributes($annotationName, ReflectionAttribute::IS_INSTANCEOF) !== []) {
-            return true;
+        $hasNativeMarker = false;
+
+        foreach (self::MARKER_ANNOTATIONS as $marker) {
+            if ($reflectionProperty->getAttributes($marker, ReflectionAttribute::IS_INSTANCEOF) !== []) {
+                $markers[$marker] = true;
+                $hasNativeMarker  = true;
+            }
         }
 
-        // A property that opts into the native attribute syntax for any marker is
-        // not read from the docblock: this keeps an unrelated foreign docblock
-        // annotation from breaking an already-natively-annotated property, while
-        // a genuinely fumbled docblock marker (e.g. a forgotten use import) on a
-        // docblock-only property still fails loudly.
-        if ($this->hasNativeMarker($reflectionProperty)) {
-            return false;
+        if ($hasNativeMarker) {
+            return $this->markerCache[$cacheKey] = $markers;
         }
 
         // Doctrine docblock annotation syntax
         $this->annotationReader ??= new AnnotationReader();
 
         foreach ($this->annotationReader->getPropertyAnnotations($reflectionProperty) as $annotation) {
-            if ($annotation instanceof $annotationName) {
-                return true;
+            foreach (self::MARKER_ANNOTATIONS as $marker) {
+                if ($annotation instanceof $marker) {
+                    $markers[$marker] = true;
+                }
             }
         }
 
-        return false;
-    }
-
-    /**
-     * Returns TRUE if the property carries any marker applied with the native PHP
-     * attribute syntax.
-     *
-     * @param ReflectionProperty $reflectionProperty
-     *
-     * @return bool
-     */
-    private function hasNativeMarker(ReflectionProperty $reflectionProperty): bool
-    {
-        foreach (self::MARKER_ANNOTATIONS as $marker) {
-            if ($reflectionProperty->getAttributes($marker, ReflectionAttribute::IS_INSTANCEOF) !== []) {
-                return true;
-            }
-        }
-
-        return false;
+        return $this->markerCache[$cacheKey] = $markers;
     }
 
     /**
