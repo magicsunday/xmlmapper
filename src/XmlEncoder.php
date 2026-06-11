@@ -26,7 +26,12 @@ use ReflectionException;
 use ReflectionObject;
 use ReflectionProperty;
 use Symfony\Component\PropertyInfo\PropertyInfoExtractorInterface;
-use Symfony\Component\PropertyInfo\Type;
+use Symfony\Component\TypeInfo\Type;
+use Symfony\Component\TypeInfo\Type\BuiltinType;
+use Symfony\Component\TypeInfo\Type\CollectionType;
+use Symfony\Component\TypeInfo\Type\ObjectType;
+use Symfony\Component\TypeInfo\Type\WrappingTypeInterface;
+use Symfony\Component\TypeInfo\TypeIdentifier;
 
 use function array_key_exists;
 use function is_bool;
@@ -53,9 +58,9 @@ class XmlEncoder
     /**
      * The default type instance.
      *
-     * @var Type
+     * @var BuiltinType<TypeIdentifier::STRING>
      */
-    private Type $defaultType;
+    private BuiltinType $defaultType;
 
     /**
      * @var PropertyInfoExtractorInterface
@@ -90,7 +95,7 @@ class XmlEncoder
         $this->domDocument->xmlStandalone = false;
         $this->domDocument->formatOutput  = true;
 
-        $this->defaultType   = new Type(Type::BUILTIN_TYPE_STRING);
+        $this->defaultType   = new BuiltinType(TypeIdentifier::STRING);
         $this->extractor     = $extractor;
         $this->nameConverter = $nameConverter;
     }
@@ -163,12 +168,13 @@ class XmlEncoder
             $property      = $reflection->getProperty($propertyName);
             $propertyValue = $property->getValue($instance);
             $propertyType  = $this->getType($className, $propertyName);
+            $builtinType   = $this->getBuiltinTypeName($propertyType);
 
-            if ($this->isCustomType($propertyType->getBuiltinType())) {
+            if ($this->isCustomType($builtinType)) {
                 $propertyValue = $this->callCustomClosure(
                     $propertyName,
                     $propertyValue,
-                    $propertyType->getBuiltinType()
+                    $builtinType
                 );
             }
 
@@ -218,7 +224,7 @@ class XmlEncoder
             }
 
             // Process collections
-            if ($propertyType->isCollection()) {
+            if ($this->isCollection($propertyType)) {
                 $this->encodeCollection(
                     $domElement,
                     $this->getCollectionValueType($propertyType),
@@ -240,6 +246,65 @@ class XmlEncoder
     }
 
     /**
+     * Strips nullability wrappers (e.g. "?Foo") from the given type while preserving
+     * its collection and object semantics.
+     *
+     * @param Type $type
+     *
+     * @return Type
+     */
+    private function getBaseType(Type $type): Type
+    {
+        while (($type instanceof WrappingTypeInterface) && !($type instanceof CollectionType)) {
+            $type = $type->getWrappedType();
+        }
+
+        return $type;
+    }
+
+    /**
+     * Returns the builtin type name used to look up custom type closures. Custom
+     * type closures are registered under the builtin type name, so object and
+     * collection types resolve to "object" and "array" respectively.
+     *
+     * @param Type $type
+     *
+     * @return string
+     */
+    private function getBuiltinTypeName(Type $type): string
+    {
+        $baseType = $this->getBaseType($type);
+
+        if ($baseType instanceof BuiltinType) {
+            return $baseType->getTypeIdentifier()->value;
+        }
+
+        if ($baseType instanceof CollectionType) {
+            return TypeIdentifier::ARRAY->value;
+        }
+
+        if ($baseType instanceof ObjectType) {
+            return TypeIdentifier::OBJECT->value;
+        }
+
+        // Union, intersection and other composite types have no single builtin
+        // name, so they fall through to the scalar string path.
+        return TypeIdentifier::STRING->value;
+    }
+
+    /**
+     * Returns TRUE if the given type describes a collection.
+     *
+     * @param Type $type
+     *
+     * @return bool
+     */
+    private function isCollection(Type $type): bool
+    {
+        return $this->getBaseType($type) instanceof CollectionType;
+    }
+
+    /**
      * Gets collection value type.
      *
      * @param Type $type
@@ -248,9 +313,13 @@ class XmlEncoder
      */
     private function getCollectionValueType(Type $type): Type
     {
-        $collectionValueType = $type->getCollectionValueTypes()[0] ?? null;
+        $baseType = $this->getBaseType($type);
 
-        return $collectionValueType ?? $this->defaultType;
+        if ($baseType instanceof CollectionType) {
+            return $baseType->getCollectionValueType();
+        }
+
+        return $this->defaultType;
     }
 
     /**
@@ -366,14 +435,14 @@ class XmlEncoder
     /**
      * Determine the type for the specified property using reflection.
      *
-     * @param string $class
-     * @param string $propertyName
+     * @param class-string $class
+     * @param string       $propertyName
      *
      * @return Type
      */
     private function getType(string $class, string $propertyName): Type
     {
-        return $this->extractor->getTypes($class, $propertyName)[0] ?? $this->defaultType;
+        return $this->extractor->getType($class, $propertyName) ?? $this->defaultType;
     }
 
     /**
@@ -416,7 +485,7 @@ class XmlEncoder
      */
     private function encodeObjectOrScalar(DOMElement $parent, Type $type, string $name, mixed $value): void
     {
-        if ($type->getBuiltinType() === Type::BUILTIN_TYPE_OBJECT) {
+        if ($this->getBaseType($type) instanceof ObjectType) {
             /** @var XmlSerializable $value */
             $this->encodeObject($parent, $name, $value);
         } else {

@@ -12,6 +12,8 @@ declare(strict_types=1);
 namespace MagicSunday\Test\Converter;
 
 use MagicSunday\XmlMapper\Converter\CamelCasePropertyNameConverter;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -21,13 +23,13 @@ use PHPUnit\Framework\TestCase;
  * @license https://opensource.org/licenses/MIT
  * @link    https://github.com/magicsunday/xmlmapper/
  */
+#[CoversClass(CamelCasePropertyNameConverter::class)]
 class CamelCasePropertyNameConverterTest extends TestCase
 {
     /**
      * Tests mapping properties to camel case.
-     *
-     * @test
      */
+    #[Test]
     public function checkCamelCasePropertyNameConverter(): void
     {
         $converter = new CamelCasePropertyNameConverter();
