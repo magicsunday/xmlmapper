@@ -139,7 +139,7 @@ class XmlEncoderTest extends TestCase
     {
         $xml = (string) $this->getXmlEncoder()->map(new Comment());
 
-        self::assertStringContainsString('<![CDATA[<b>hi</b>]]>', $xml);
+        self::assertStringContainsString('<comment><![CDATA[<b>hi</b>]]></comment>', $xml);
     }
 
     /**
@@ -211,10 +211,24 @@ class XmlEncoderTest extends TestCase
         $book->author = new Author();
         $book->labels = ['draft', 'review'];
 
-        $xml = (string) $this->getXmlEncoder()->map($book);
-
-        self::assertStringContainsString('<labels>draft</labels>', $xml);
-        self::assertStringContainsString('<labels>review</labels>', $xml);
+        self::assertXmlStringEqualsXmlString(
+            <<<'XML'
+                <?xml version="1.0" encoding="UTF-8"?>
+                <book isbn="978-3-16-148410-0">
+                    <title>The Title</title>
+                    <author>
+                        <name>Jane Doe</name>
+                    </author>
+                    <tags>php</tags>
+                    <tags>xml</tags>
+                    <labels>draft</labels>
+                    <labels>review</labels>
+                    <misc>a</misc>
+                    <misc>b</misc>
+                </book>
+                XML,
+            $this->getXmlEncoder()->map($book)
+        );
     }
 
     /**
@@ -242,14 +256,15 @@ class XmlEncoderTest extends TestCase
     }
 
     /**
-     * A union-typed property has no single builtin type and is encoded through the
-     * scalar fallback path.
+     * A union of scalar types resolves to its first member and is encoded through
+     * the scalar path.
      */
     #[Test]
     public function encodesUnionTypedPropertyAsScalar(): void
     {
-        $xml = (string) $this->getXmlEncoder()->map(new UnionProperty());
-
-        self::assertStringContainsString('<code>7</code>', $xml);
+        self::assertXmlStringEqualsXmlString(
+            '<?xml version="1.0" encoding="UTF-8"?><unionProperty><code>7</code></unionProperty>',
+            $this->getXmlEncoder()->map(new UnionProperty())
+        );
     }
 }
