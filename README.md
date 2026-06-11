@@ -69,9 +69,7 @@ final class Author implements XmlSerializable
 
 final class Book implements XmlSerializable
 {
-    /**
-     * @XmlAttribute
-     */
+    #[XmlAttribute]
     public string $isbn = '978-3-16-148410-0';
 
     public string $title = 'The Title';
@@ -131,15 +129,16 @@ The name converter is optional; without it the raw class and property names are 
 /** @var array<int, Author|Chapter> $members */
 ```
 
-### Property annotations
+### Property markers
 
-Place these annotations in a property's PHPDoc block to change how its value is rendered:
+Each marker can be applied as a native PHP attribute (shown above) or as the
+equivalent Doctrine docblock annotation (`@XmlAttribute`); both are recognised.
 
-| Annotation         | Effect                                                              |
+| Marker             | Effect                                                              |
 |--------------------|--------------------------------------------------------------------|
-| `@XmlAttribute`    | Render the value as an attribute of the surrounding element.        |
-| `@XmlNodeValue`    | Render the value as the raw text content of the surrounding element.|
-| `@XmlCDataSection` | Wrap the value in a `<![CDATA[ … ]]>` section (markup left intact). |
+| `XmlAttribute`     | Render the value as an attribute of the surrounding element.        |
+| `XmlNodeValue`     | Render the value as the raw text content of the surrounding element.|
+| `XmlCDataSection`  | Wrap the value in a `<![CDATA[ … ]]>` section (markup left intact). |
 
 ### Custom types
 
@@ -148,6 +147,16 @@ Register a closure to transform every value of a given builtin type (`bool`, `in
 ```php
 $encoder->addType('bool', static fn (string $name, mixed $value): string => $value === true ? 'yes' : 'no');
 ```
+
+## 📚 Documentation
+
+* [API reference](docs/API.md)
+* Recipes
+  * [Manual instantiation](docs/recipes/manual-instantiation.md) — wiring the Symfony extractor and name converter
+  * [Markers: attributes, node values and CDATA](docs/recipes/markers.md) — native attribute and docblock syntax
+  * [Custom types](docs/recipes/type-converters.md) — transforming values with `addType()`
+  * [Custom name converter](docs/recipes/custom-name-converter.md) — element naming
+  * [Collections](docs/recipes/collections.md) — scalar, object, nullable and union-typed collections
 
 ## 🛠️ Development
 
