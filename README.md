@@ -11,7 +11,7 @@
 
 <!-- Row 2: Standards / Tooling badges -->
 <p align="center">
-  <a href="https://phpstan.org/"><img src="https://img.shields.io/badge/PHPStan-level%208-brightgreen.svg" alt="PHPStan Level 8"></a>
+  <a href="https://phpstan.org/"><img src="https://img.shields.io/badge/PHPStan-max%20level-brightgreen.svg" alt="PHPStan Max Level"></a>
   <a href="https://phpunit.de/"><img src="https://img.shields.io/badge/PHPUnit-11%20%7C%2012-blue.svg" alt="PHPUnit 11 | 12"></a>
   <a href="https://getrector.com/"><img src="https://img.shields.io/badge/Rector-2.0-orange.svg" alt="Rector 2.0"></a>
   <a href="https://www.php-fig.org/per/coding-style/"><img src="https://img.shields.io/badge/Code%20Style-PER--CS%202.0-blue.svg" alt="PER-CS 2.0"></a>
@@ -171,7 +171,7 @@ composer ci:test
 `ci:test` includes:
 
 - Linting (`phplint`)
-- Static analysis (`phpstan`, level 8)
+- Static analysis (`phpstan`, max level)
 - Refactoring dry-run (`rector --dry-run`)
 - Unit tests (`phpunit`)
 - Coding standards dry-run (`php-cs-fixer --dry-run`)
