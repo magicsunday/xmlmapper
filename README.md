@@ -1,34 +1,181 @@
-[![Latest version](https://img.shields.io/github/v/release/magicsunday/xmlmapper?sort=semver)](https://github.com/magicsunday/xmlmapper/releases/latest)
-[![License](https://img.shields.io/github/license/magicsunday/xmlmapper)](https://github.com/magicsunday/xmlmapper/blob/main/LICENSE)
-[![CI](https://github.com/magicsunday/xmlmapper/actions/workflows/ci.yml/badge.svg)](https://github.com/magicsunday/xmlmapper/actions/workflows/ci.yml)
+<h1 align="center">XmlMapper: PHP Object to XML Mapping</h1>
 
-# XmlMapper
-This module provides a mapper to map PHP classes to XML utilizing Symfony's property info and access packages.
+<p align="center">
+  Map strongly-typed PHP objects to XML using Symfony's PropertyInfo, PropertyAccess and TypeInfo components.
+</p>
 
-## Installation
+<!-- Row 1: CI / Quality badges -->
+<p align="center">
+  <a href="https://github.com/magicsunday/xmlmapper/actions/workflows/ci.yml"><img src="https://github.com/magicsunday/xmlmapper/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+</p>
 
-### Using Composer
-To install using [composer](https://getcomposer.org/), just run the following command from the command line.
+<!-- Row 2: Standards / Tooling badges -->
+<p align="center">
+  <a href="https://phpstan.org/"><img src="https://img.shields.io/badge/PHPStan-level%208-brightgreen.svg" alt="PHPStan Level 8"></a>
+  <a href="https://phpunit.de/"><img src="https://img.shields.io/badge/PHPUnit-11%20%7C%2012-blue.svg" alt="PHPUnit 11 | 12"></a>
+  <a href="https://getrector.com/"><img src="https://img.shields.io/badge/Rector-2.0-orange.svg" alt="Rector 2.0"></a>
+  <a href="https://www.php-fig.org/per/coding-style/"><img src="https://img.shields.io/badge/Code%20Style-PER--CS%202.0-blue.svg" alt="PER-CS 2.0"></a>
+</p>
+
+<!-- Row 3: Compatibility badges -->
+<p align="center">
+  <a href="composer.json"><img src="https://img.shields.io/badge/php-8.2%20|%208.3%20|%208.4%20|%208.5-blue" alt="PHP Version"></a>
+</p>
+
+<!-- Row 4: Project badges -->
+<p align="center">
+  <a href="https://github.com/magicsunday/xmlmapper/releases/latest"><img src="https://img.shields.io/github/v/release/magicsunday/xmlmapper?sort=semver" alt="Latest version"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/magicsunday/xmlmapper" alt="License"></a>
+</p>
+
+---
+
+## 📌 Overview
+XmlMapper is a PHP library that maps strongly-typed PHP objects (DTOs, value objects, entities) to XML using reflection and PHPDoc annotations. It leverages Symfony's PropertyInfo, PropertyAccess and TypeInfo components to derive each property's type and render a matching XML document.
+
+| Key      | Value                                              |
+|----------|----------------------------------------------------|
+| Package  | `magicsunday/xmlmapper`                            |
+| PHP      | `^8.2`                                             |
+| Main API | `MagicSunday\XmlEncoder`                           |
+| Output   | XML string (`string`), or `false` on failure       |
+
+## ❓ What is this?
+XmlMapper takes a PHP object implementing `MagicSunday\XmlSerializable` and renders it as XML, including nested objects, scalar and object collections, and custom types. Property values are routed to elements, attributes, raw text nodes or CDATA sections via a small set of annotations, and property names can be converted on the fly (e.g. snake_case to camelCase).
+
+## 🎯 Why does this exist?
+Serializing domain objects to XML usually means hand-writing `DOMDocument`/`XMLWriter` boilerplate that drifts from the underlying model. XmlMapper derives the XML structure from the object's typed properties and a few annotations, so the output follows the PHP model, with explicit hooks (attributes, CDATA, node values, custom type closures) where you need to deviate.
+
+## 🚀 Usage
 
 ```bash
 composer require magicsunday/xmlmapper
 ```
 
-To remove the module run:
-```bash
-composer remove magicsunday/xmlmapper
+### Quick start
+
+Annotate the classes you want to serialize and let them implement `XmlSerializable`:
+
+```php
+namespace App\Model;
+
+use MagicSunday\XmlSerializable;
+use MagicSunday\XmlMapper\Annotation\XmlAttribute;
+
+final class Author implements XmlSerializable
+{
+    public string $name = 'Jane Doe';
+}
+
+final class Book implements XmlSerializable
+{
+    /**
+     * @XmlAttribute
+     */
+    public string $isbn = '978-3-16-148410-0';
+
+    public string $title = 'The Title';
+
+    public Author $author;
+
+    /**
+     * @var string[]
+     */
+    public array $tags = ['php', 'xml'];
+}
 ```
 
+Build an encoder and map an instance:
 
-## Development
+```php
+require __DIR__ . '/vendor/autoload.php';
 
-### Testing
+use App\Model\Author;
+use App\Model\Book;
+use MagicSunday\XmlEncoder;
+use MagicSunday\XmlMapper\Converter\CamelCasePropertyNameConverter;
+use Symfony\Component\PropertyInfo\Extractor\PhpDocExtractor;
+use Symfony\Component\PropertyInfo\Extractor\ReflectionExtractor;
+use Symfony\Component\PropertyInfo\PropertyInfoExtractor;
+
+$extractor = new PropertyInfoExtractor(
+    [new ReflectionExtractor()],
+    [new PhpDocExtractor()]
+);
+
+$book         = new Book();
+$book->author = new Author();
+
+$encoder = new XmlEncoder($extractor, new CamelCasePropertyNameConverter());
+
+echo $encoder->map($book);
+```
+
+```xml
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<book isbn="978-3-16-148410-0">
+  <title>The Title</title>
+  <author>
+    <name>Jane Doe</name>
+  </author>
+  <tags>php</tags>
+  <tags>xml</tags>
+</book>
+```
+
+The name converter is optional; without it the raw class and property names are used verbatim. For collections, annotate the property with the phpDocumentor collection type so the value type can be resolved:
+
+```php
+/** @var string[] $tags */
+/** @var Chapter[] $chapters */
+/** @var array<int, Author|Chapter> $members */
+```
+
+### Property annotations
+
+Place these annotations in a property's PHPDoc block to change how its value is rendered:
+
+| Annotation         | Effect                                                              |
+|--------------------|--------------------------------------------------------------------|
+| `@XmlAttribute`    | Render the value as an attribute of the surrounding element.        |
+| `@XmlNodeValue`    | Render the value as the raw text content of the surrounding element.|
+| `@XmlCDataSection` | Wrap the value in a `<![CDATA[ … ]]>` section (markup left intact). |
+
+### Custom types
+
+Register a closure to transform every value of a given builtin type (`bool`, `int`, `array`, `object`, …) before it is written:
+
+```php
+$encoder->addType('bool', static fn (string $name, mixed $value): string => $value === true ? 'yes' : 'no');
+```
+
+## 🛠️ Development
+
+Prerequisites:
+
+- PHP `^8.2`
+- Extensions: `dom`
+
+Install dependencies:
+
 ```bash
-composer update
-composer ci:cgl
+composer install
+```
+
+Run the mandatory quality gate:
+
+```bash
 composer ci:test
-composer ci:test:php:phplint
-composer ci:test:php:phpstan
-composer ci:test:php:rector
-composer ci:test:php:unit
 ```
+
+`ci:test` includes:
+
+- Linting (`phplint`)
+- Static analysis (`phpstan`, level 8)
+- Refactoring dry-run (`rector --dry-run`)
+- Unit tests (`phpunit`)
+- Coding standards dry-run (`php-cs-fixer --dry-run`)
+
+## 🤝 Contributing
+
+Contributions are welcome. Please run the full `composer ci:test` quality gate before submitting a pull request, and keep changes covered by tests.
