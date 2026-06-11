@@ -227,7 +227,6 @@ class XmlEncoder
             if ($this->isCollection($propertyType)) {
                 $this->encodeCollection(
                     $domElement,
-                    $this->getCollectionValueType($propertyType),
                     $xmlPropertyName,
                     $propertyValue
                 );
@@ -238,7 +237,6 @@ class XmlEncoder
             // Process any other data
             $this->encodeObjectOrScalar(
                 $domElement,
-                $propertyType,
                 $xmlPropertyName,
                 $propertyValue
             );
@@ -255,6 +253,8 @@ class XmlEncoder
      */
     private function getBaseType(Type $type): Type
     {
+        // Never unwrap a collection: it is itself a WrappingTypeInterface and
+        // unwrapping it would discard the collection semantics.
         while (($type instanceof WrappingTypeInterface) && !($type instanceof CollectionType)) {
             $type = $type->getWrappedType();
         }
@@ -288,7 +288,7 @@ class XmlEncoder
         }
 
         // Union, intersection and other composite types have no single builtin
-        // name, so they fall through to the scalar string path.
+        // name, so they fall back to "string" as the custom-closure lookup key.
         return TypeIdentifier::STRING->value;
     }
 
@@ -302,24 +302,6 @@ class XmlEncoder
     private function isCollection(Type $type): bool
     {
         return $this->getBaseType($type) instanceof CollectionType;
-    }
-
-    /**
-     * Gets collection value type.
-     *
-     * @param Type $type
-     *
-     * @return Type
-     */
-    private function getCollectionValueType(Type $type): Type
-    {
-        $baseType = $this->getBaseType($type);
-
-        if ($baseType instanceof CollectionType) {
-            return $baseType->getCollectionValueType();
-        }
-
-        return $this->defaultType;
     }
 
     /**
@@ -460,33 +442,33 @@ class XmlEncoder
      *       <property>value1</property>
      *       <property>value2</property>
      *
-     * @param Type   $type   The type value object
      * @param string $name   The XML node name
      * @param mixed  $values The collection values to encode to the XML
      *
      * @throws DOMException
      */
-    private function encodeCollection(DOMElement $parent, Type $type, string $name, mixed $values): void
+    private function encodeCollection(DOMElement $parent, string $name, mixed $values): void
     {
         // Process all entries in the collection
         foreach ($values as $value) {
-            $this->encodeObjectOrScalar($parent, $type, $name, $value);
+            $this->encodeObjectOrScalar($parent, $name, $value);
         }
     }
 
     /**
-     * Encodes an object or scalar value into XML.
+     * Encodes an object or scalar value into XML. The object-versus-scalar
+     * decision is made from the runtime value rather than the declared type, so
+     * a union- or intersection-typed property (whose declared type cannot name a
+     * single class) still encodes each entry by its real type.
      *
-     * @param Type   $type  The type value object
      * @param string $name  The XML node name
      * @param mixed  $value The XML node value
      *
      * @throws DOMException
      */
-    private function encodeObjectOrScalar(DOMElement $parent, Type $type, string $name, mixed $value): void
+    private function encodeObjectOrScalar(DOMElement $parent, string $name, mixed $value): void
     {
-        if ($this->getBaseType($type) instanceof ObjectType) {
-            /** @var XmlSerializable $value */
+        if ($value instanceof XmlSerializable) {
             $this->encodeObject($parent, $name, $value);
         } else {
             // Write encoded value directly into XML output

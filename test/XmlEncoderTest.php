@@ -18,6 +18,7 @@ use MagicSunday\Test\Fixture\Comment;
 use MagicSunday\Test\Fixture\CustomTypeHost;
 use MagicSunday\Test\Fixture\Person;
 use MagicSunday\Test\Fixture\Price;
+use MagicSunday\Test\Fixture\UnionObjectHost;
 use MagicSunday\Test\Fixture\UnionProperty;
 use MagicSunday\XmlEncoder;
 use MagicSunday\XmlMapper\Annotation\XmlAttribute;
@@ -256,8 +257,8 @@ class XmlEncoderTest extends TestCase
     }
 
     /**
-     * A union of scalar types resolves to its first member and is encoded through
-     * the scalar path.
+     * A scalar-valued union-typed property is encoded through the scalar path,
+     * because its runtime value is not an XmlSerializable object.
      */
     #[Test]
     public function encodesUnionTypedPropertyAsScalar(): void
@@ -265,6 +266,61 @@ class XmlEncoderTest extends TestCase
         self::assertXmlStringEqualsXmlString(
             '<?xml version="1.0" encoding="UTF-8"?><unionProperty><code>7</code></unionProperty>',
             $this->getXmlEncoder()->map(new UnionProperty())
+        );
+    }
+
+    /**
+     * A collection whose value type is a union of object types encodes every
+     * entry recursively as an object, because the object-versus-scalar decision
+     * is made from each runtime value rather than the union type (which cannot
+     * name a single class).
+     */
+    #[Test]
+    public function encodesUnionOfObjectTypes(): void
+    {
+        $host          = new UnionObjectHost();
+        $host->members = [new Author(), new Chapter('X', 9)];
+
+        self::assertXmlStringEqualsXmlString(
+            <<<'XML'
+                <?xml version="1.0" encoding="UTF-8"?>
+                <unionObjectHost>
+                    <members>
+                        <name>Jane Doe</name>
+                    </members>
+                    <members>
+                        <heading>X</heading>
+                        <number>9</number>
+                    </members>
+                </unionObjectHost>
+                XML,
+            $this->getXmlEncoder()->map($host)
+        );
+    }
+
+    /**
+     * A collection whose value type is a union mixing a scalar and an object
+     * type encodes each entry by its runtime value: scalars through the scalar
+     * path and objects recursively. This guards against routing every entry
+     * through one branch based on the static union type.
+     */
+    #[Test]
+    public function encodesCollectionWithMixedScalarAndObjectValues(): void
+    {
+        $host        = new UnionObjectHost();
+        $host->mixed = [42, new Author()];
+
+        self::assertXmlStringEqualsXmlString(
+            <<<'XML'
+                <?xml version="1.0" encoding="UTF-8"?>
+                <unionObjectHost>
+                    <mixed>42</mixed>
+                    <mixed>
+                        <name>Jane Doe</name>
+                    </mixed>
+                </unionObjectHost>
+                XML,
+            $this->getXmlEncoder()->map($host)
         );
     }
 }
