@@ -12,7 +12,6 @@ declare(strict_types=1);
 namespace MagicSunday;
 
 use Closure;
-use Doctrine\Common\Annotations\AnnotationException;
 use Doctrine\Common\Annotations\AnnotationReader;
 use DOMDocument;
 use DOMElement;
@@ -52,6 +51,17 @@ use function is_scalar;
  */
 class XmlEncoder
 {
+    /**
+     * The property marker annotations recognised by the encoder.
+     *
+     * @var list<class-string>
+     */
+    private const MARKER_ANNOTATIONS = [
+        XmlAttribute::class,
+        XmlNodeValue::class,
+        XmlCDataSection::class,
+    ];
+
     /**
      * XMLWriter instance.
      *
@@ -389,20 +399,39 @@ class XmlEncoder
             return true;
         }
 
-        // Doctrine docblock annotation syntax
-        $this->annotationReader ??= new AnnotationReader();
-
-        try {
-            $annotations = $this->annotationReader->getPropertyAnnotations($reflectionProperty);
-        } catch (AnnotationException) {
-            // The docblock carries annotations this reader cannot resolve (e.g.
-            // from another library). None of them is one of our markers, so the
-            // property is treated as unmarked rather than failing the encoding.
+        // A property that opts into the native attribute syntax for any marker is
+        // not read from the docblock: this keeps an unrelated foreign docblock
+        // annotation from breaking an already-natively-annotated property, while
+        // a genuinely fumbled docblock marker (e.g. a forgotten use import) on a
+        // docblock-only property still fails loudly.
+        if ($this->hasNativeMarker($reflectionProperty)) {
             return false;
         }
 
-        foreach ($annotations as $annotation) {
+        // Doctrine docblock annotation syntax
+        $this->annotationReader ??= new AnnotationReader();
+
+        foreach ($this->annotationReader->getPropertyAnnotations($reflectionProperty) as $annotation) {
             if ($annotation instanceof $annotationName) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Returns TRUE if the property carries any marker applied with the native PHP
+     * attribute syntax.
+     *
+     * @param ReflectionProperty $reflectionProperty
+     *
+     * @return bool
+     */
+    private function hasNativeMarker(ReflectionProperty $reflectionProperty): bool
+    {
+        foreach (self::MARKER_ANNOTATIONS as $marker) {
+            if ($reflectionProperty->getAttributes($marker, ReflectionAttribute::IS_INSTANCEOF) !== []) {
                 return true;
             }
         }
