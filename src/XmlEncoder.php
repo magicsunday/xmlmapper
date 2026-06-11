@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace MagicSunday;
 
 use Closure;
+use Doctrine\Common\Annotations\AnnotationException;
 use Doctrine\Common\Annotations\AnnotationReader;
 use DOMDocument;
 use DOMElement;
@@ -166,11 +167,10 @@ class XmlEncoder
         /** @var class-string<TEntity> $className */
         $className  = $this->getClassName($instance);
         $properties = $this->extractor->getProperties($className) ?? [];
+        $reflection = new ReflectionObject($instance);
 
         // Process all properties of the class
         foreach ($properties as $propertyName) {
-            $reflection = new ReflectionObject($instance);
-
             if (!$reflection->hasProperty($propertyName)) {
                 continue;
             }
@@ -392,7 +392,16 @@ class XmlEncoder
         // Doctrine docblock annotation syntax
         $this->annotationReader ??= new AnnotationReader();
 
-        foreach ($this->annotationReader->getPropertyAnnotations($reflectionProperty) as $annotation) {
+        try {
+            $annotations = $this->annotationReader->getPropertyAnnotations($reflectionProperty);
+        } catch (AnnotationException) {
+            // The docblock carries annotations this reader cannot resolve (e.g.
+            // from another library). None of them is one of our markers, so the
+            // property is treated as unmarked rather than failing the encoding.
+            return false;
+        }
+
+        foreach ($annotations as $annotation) {
             if ($annotation instanceof $annotationName) {
                 return true;
             }
