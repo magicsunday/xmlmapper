@@ -85,6 +85,13 @@ class XmlEncoder
     private array $types = [];
 
     /**
+     * The lazily created Doctrine annotation reader, shared across property checks.
+     *
+     * @var AnnotationReader|null
+     */
+    private ?AnnotationReader $annotationReader = null;
+
+    /**
      * XmlEncoder constructor.
      *
      * @param PropertyInfoExtractorInterface      $extractor
@@ -383,7 +390,9 @@ class XmlEncoder
         }
 
         // Doctrine docblock annotation syntax
-        foreach ((new AnnotationReader())->getPropertyAnnotations($reflectionProperty) as $annotation) {
+        $this->annotationReader ??= new AnnotationReader();
+
+        foreach ($this->annotationReader->getPropertyAnnotations($reflectionProperty) as $annotation) {
             if ($annotation instanceof $annotationName) {
                 return true;
             }
