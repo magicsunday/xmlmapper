@@ -11,11 +11,13 @@ declare(strict_types=1);
 
 namespace MagicSunday\XmlMapper\Annotation;
 
+use Attribute;
 use Doctrine\Common\Annotations\Annotation;
 
 /**
  * This annotation is used to inform the XmlMapper that the property should be added
- * as an XML attribute when converting to XML.
+ * as an XML attribute when converting to XML. It can be applied either as a native
+ * PHP attribute (#[XmlAttribute]) or as a Doctrine docblock annotation (@XmlAttribute).
  *
  * @author  Rico Sonntag <mail@ricosonntag.de>
  * @license https://opensource.org/licenses/MIT
@@ -25,6 +27,7 @@ use Doctrine\Common\Annotations\Annotation;
  *
  * @Target({"PROPERTY"})
  */
+#[Attribute(Attribute::TARGET_PROPERTY)]
 final class XmlAttribute extends Annotation
 {
 }
