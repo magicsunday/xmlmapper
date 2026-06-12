@@ -452,6 +452,8 @@ class XmlEncoder
             foreach (self::MARKER_ANNOTATIONS as $marker) {
                 if ($annotation instanceof $marker) {
                     $markers[$marker] = true;
+
+                    break;
                 }
             }
         }
