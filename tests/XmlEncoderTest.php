@@ -19,6 +19,7 @@ use MagicSunday\Test\Fixture\Comment;
 use MagicSunday\Test\Fixture\CustomTypeHost;
 use MagicSunday\Test\Fixture\NativeCData;
 use MagicSunday\Test\Fixture\NativeMarkers;
+use MagicSunday\Test\Fixture\NativeWithForeignAttribute;
 use MagicSunday\Test\Fixture\NativeWithForeignDocblock;
 use MagicSunday\Test\Fixture\Person;
 use MagicSunday\Test\Fixture\Price;
@@ -185,6 +186,24 @@ class XmlEncoderTest extends TestCase
         self::assertStringContainsString(
             '<nativeWithForeignDocblock><![CDATA[<b>hi</b>]]></nativeWithForeignDocblock>',
             $xml
+        );
+    }
+
+    /**
+     * A foreign native attribute is ignored by the single-pass attribute scan: a
+     * marker on the same property still resolves (currency becomes an attribute),
+     * while a property carrying only the foreign attribute gets no marker and is
+     * rendered as a plain child element. Mapped without a name converter, so the
+     * raw (capitalised) class short name is used as the root element.
+     */
+    #[Test]
+    public function ignoresForeignNativeAttributeWhileResolvingMarkers(): void
+    {
+        $extractor = new PropertyInfoExtractor([new ReflectionExtractor()], [new PhpDocExtractor()]);
+
+        self::assertXmlStringEqualsXmlString(
+            '<?xml version="1.0" encoding="UTF-8"?><NativeWithForeignAttribute currency="EUR"><label>x</label></NativeWithForeignAttribute>',
+            (string) (new XmlEncoder($extractor))->map(new NativeWithForeignAttribute())
         );
     }
 

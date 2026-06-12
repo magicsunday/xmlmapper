@@ -19,7 +19,6 @@ use MagicSunday\XmlMapper\Annotation\XmlAttribute;
 use MagicSunday\XmlMapper\Annotation\XmlCDataSection;
 use MagicSunday\XmlMapper\Annotation\XmlNodeValue;
 use MagicSunday\XmlMapper\Converter\PropertyNameConverterInterface;
-use ReflectionAttribute;
 use ReflectionClass;
 use ReflectionException;
 use ReflectionObject;
@@ -413,9 +412,14 @@ class XmlEncoder
             return $this->markerCache[$cacheKey] = $markers;
         }
 
-        foreach (self::MARKER_ANNOTATIONS as $marker) {
-            if ($reflectionProperty->getAttributes($marker, ReflectionAttribute::IS_INSTANCEOF) !== []) {
-                $markers[$marker] = true;
+        // The marker classes are final, so an exact attribute-name match is
+        // equivalent to an instanceof check: read all attributes once and flag
+        // the markers present, rather than querying reflection per marker.
+        foreach ($reflectionProperty->getAttributes() as $attribute) {
+            $name = $attribute->getName();
+
+            if (isset($markers[$name])) {
+                $markers[$name] = true;
             }
         }
 
