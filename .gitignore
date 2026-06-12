@@ -10,6 +10,11 @@ bin/
 logs/
 composer.lock
 
+# NPM
+node_modules/
+package.json
+package-lock.json
+
 # Build stuff
 .build/
 
@@ -18,6 +23,3 @@ composer.lock
 .phplint.cache
 .phpunit.result.cache
 .phpunit.cache
-
-# Custom
-/test/

@@ -46,9 +46,6 @@ use function is_scalar;
  * @author  Rico Sonntag <mail@ricosonntag.de>
  * @license https://opensource.org/licenses/MIT
  * @link    https://github.com/magicsunday/xmlmapper/
- *
- * @template TEntity
- * @template TEntityCollection
  */
 class XmlEncoder
 {
@@ -182,7 +179,7 @@ class XmlEncoder
      */
     private function encodeElement(DOMElement $domElement, XmlSerializable $instance): void
     {
-        /** @var class-string<TEntity> $className */
+        /** @var class-string $className */
         $className  = $this->getClassName($instance);
         $properties = $this->extractor->getProperties($className) ?? [];
         $reflection = new ReflectionObject($instance);

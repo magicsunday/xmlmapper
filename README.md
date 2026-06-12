@@ -164,6 +164,7 @@ Prerequisites:
 
 - PHP `^8.2`
 - Extensions: `dom`
+- Node.js (for the copy-paste detection gate, run via `npx`)
 
 Install dependencies:
 
@@ -180,10 +181,11 @@ composer ci:test
 `ci:test` includes:
 
 - Linting (`phplint`)
+- Unit tests (`phpunit`)
 - Static analysis (`phpstan`, max level)
 - Refactoring dry-run (`rector --dry-run`)
-- Unit tests (`phpunit`)
 - Coding standards dry-run (`php-cs-fixer --dry-run`)
+- Copy-paste detection (`jscpd`)
 
 ## 🤝 Contributing
 

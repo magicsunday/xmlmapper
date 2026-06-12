@@ -17,70 +17,60 @@ jobs:
                 php: ['8.2', '8.3', '8.4', '8.5']
 
         steps:
-            - id: checkout
-              name: Checkout
-              uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-              with:
-                  persist-credentials: false
-
-            - id: setup_php
-              name: Set up PHP version ${{ matrix.php }}
+            - name: Set up PHP version ${{ matrix.php }}
               uses: shivammathur/setup-php@7c071dfe9dc99bdf297fa79cb49ea005b9fcadbc # v2
               with:
                   php-version: ${{ matrix.php }}
                   tools: composer:v2, php-cs-fixer
 
+            - name: Checkout repository
+              uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+              with:
+                  persist-credentials: false
+
             - name: Validate composer.json and composer.lock
               run: composer validate
 
-            - id: composer-cache-vars
-              name: Composer Cache Vars
+            - name: Get composer cache directory
+              id: composer-cache
               run: |
                   echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
-                  echo "timestamp=$(date +"%s")" >> $GITHUB_OUTPUT
-
-            - id: composer-cache-dependencies
-              name: Cache Composer dependencies
+            - name: Cache Composer dependencies
               uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
               with:
-                  path: ${{ steps.composer-cache-vars.outputs.dir }}
-                  key: ${{ runner.os }}-composer-${{ matrix.php }}-${{ steps.composer-cache-vars.outputs.timestamp }}
+                  path: ${{ steps.composer-cache.outputs.dir }}
+                  key: ${{ runner.os }}-${{ matrix.php }}-composer-${{ hashFiles('**/composer.json') }}
                   restore-keys: |
-                      ${{ runner.os }}-composer-${{ matrix.php }}-
-                      ${{ runner.os }}-composer-
+                      ${{ runner.os }}-${{ matrix.php }}-composer-
 
-            - id: install
-              name: Install dependencies
+            - name: Install dependencies
               run: |
-                  composer validate
-                  composer install --no-progress
+                  composer install --prefer-dist --no-interaction --no-progress
 
-            - id: lint
-              name: Lint
-              if: ${{ always() && steps.install.conclusion == 'success' }}
+            - name: Lint
               run: |
                   composer ci:test:php:lint
 
-            - id: cgl
-              name: CGL
-              if: ${{ always() && steps.install.conclusion == 'success' }}
+            - name: Unit Tests
+              if: ${{ !cancelled() }}
               run: |
-                  composer ci:cgl -- --dry-run
+                  composer ci:test:php:unit
 
-            - id: phpstan
-              name: PHPStan
-              if: ${{ always() && steps.install.conclusion == 'success' }}
+            - name: PHPStan
+              if: ${{ !cancelled() }}
               run: |
                   composer ci:test:php:phpstan -- --error-format=github
 
-            - id: rector
-              name: Rector
-              if: ${{ always() && steps.install.conclusion == 'success' }}
+            - name: Rector
+              if: ${{ !cancelled() }}
               run: |
                   composer ci:test:php:rector
 
-            - id: tests_unit
-              name: Unit Tests
-              if: ${{ always() && steps.install.conclusion == 'success' }}
+            - name: CGL
+              if: ${{ !cancelled() }}
               run: |
-                  composer ci:test:php:unit
+                  composer ci:test:php:cgl
+
+            - name: CPD
+              if: ${{ !cancelled() }}
+              run: composer ci:test:php:cpd

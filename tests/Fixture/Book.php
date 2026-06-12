@@ -72,10 +72,9 @@ class Book implements XmlSerializable
     public ?array $labels = null;
 
     /**
-     * An array without a known value type, exercising the default collection
-     * value-type fallback (defaults to string).
+     * A scalar array whose entries are rendered as repeated child elements.
      *
-     * @var array
+     * @var array<int, string>
      */
     public array $misc = ['a', 'b'];
 }

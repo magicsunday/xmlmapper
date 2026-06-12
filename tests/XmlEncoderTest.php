@@ -159,7 +159,7 @@ class XmlEncoderTest extends TestCase
     {
         self::assertXmlStringEqualsXmlString(
             '<?xml version="1.0" encoding="UTF-8"?><nativeMarkers currency="EUR">42.00</nativeMarkers>',
-            $this->getXmlEncoder()->map(new NativeMarkers())
+            (string) $this->getXmlEncoder()->map(new NativeMarkers())
         );
     }
 
@@ -245,7 +245,7 @@ class XmlEncoderTest extends TestCase
                     <active>yes</active>
                 </person>
                 XML,
-            $encoder->map(new Person())
+            (string) $encoder->map(new Person())
         );
     }
 
@@ -260,7 +260,10 @@ class XmlEncoderTest extends TestCase
         $host->author = new Author();
 
         $encoder = $this->getXmlEncoder();
-        $encoder->addType('array', static fn (string $name, array $value): array => array_map('strtoupper', $value));
+        $encoder->addType('array', static function (string $name, array $value): array {
+            /** @var string[] $value */
+            return array_map('strtoupper', $value);
+        });
         $encoder->addType('object', static function (string $name, Author $value): Author {
             $value->name = strtoupper($value->name);
 
@@ -278,7 +281,7 @@ class XmlEncoderTest extends TestCase
                     </author>
                 </customTypeHost>
                 XML,
-            $encoder->map($host)
+            (string) $encoder->map($host)
         );
     }
 
@@ -310,7 +313,7 @@ class XmlEncoderTest extends TestCase
                     <misc>b</misc>
                 </book>
                 XML,
-            $this->getXmlEncoder()->map($book)
+            (string) $this->getXmlEncoder()->map($book)
         );
     }
 
@@ -334,7 +337,7 @@ class XmlEncoderTest extends TestCase
                     <active>1</active>
                 </Person>
                 XML,
-            $encoder->map(new Person())
+            (string) $encoder->map(new Person())
         );
     }
 
@@ -347,7 +350,7 @@ class XmlEncoderTest extends TestCase
     {
         self::assertXmlStringEqualsXmlString(
             '<?xml version="1.0" encoding="UTF-8"?><unionProperty><code>7</code></unionProperty>',
-            $this->getXmlEncoder()->map(new UnionProperty())
+            (string) $this->getXmlEncoder()->map(new UnionProperty())
         );
     }
 
@@ -361,11 +364,11 @@ class XmlEncoderTest extends TestCase
     public function appliesCustomTypeClosureToUnionTypedPropertyViaStringKey(): void
     {
         $encoder = $this->getXmlEncoder();
-        $encoder->addType('string', static fn (string $name, mixed $value): string => 'wrapped:' . $value);
+        $encoder->addType('string', static fn (string $name, int|string $value): string => 'wrapped:' . $value);
 
         self::assertXmlStringEqualsXmlString(
             '<?xml version="1.0" encoding="UTF-8"?><unionProperty><code>wrapped:7</code></unionProperty>',
-            $encoder->map(new UnionProperty())
+            (string) $encoder->map(new UnionProperty())
         );
     }
 
@@ -394,7 +397,7 @@ class XmlEncoderTest extends TestCase
                     </members>
                 </unionObjectHost>
                 XML,
-            $this->getXmlEncoder()->map($host)
+            (string) $this->getXmlEncoder()->map($host)
         );
     }
 
@@ -420,7 +423,7 @@ class XmlEncoderTest extends TestCase
                     </mixed>
                 </unionObjectHost>
                 XML,
-            $this->getXmlEncoder()->map($host)
+            (string) $this->getXmlEncoder()->map($host)
         );
     }
 }
