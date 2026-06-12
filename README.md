@@ -19,7 +19,7 @@
 
 <!-- Row 3: Compatibility badges -->
 <p align="center">
-  <a href="composer.json"><img src="https://img.shields.io/badge/php-8.2%20|%208.3%20|%208.4%20|%208.5-blue" alt="PHP Version"></a>
+  <a href="composer.json"><img src="https://img.shields.io/badge/php-8.2%20%7C%208.3%20%7C%208.4%20%7C%208.5-blue" alt="PHP Version"></a>
 </p>
 
 <!-- Row 4: Project badges -->
@@ -163,7 +163,7 @@ $encoder->addType('bool', static fn (string $name, mixed $value): string => $val
 Prerequisites:
 
 - PHP `^8.2`
-- Extensions: `dom`
+- Extensions: `dom`, `xml`
 - Node.js (for the copy-paste detection gate, run via `npx`)
 
 Install dependencies:
