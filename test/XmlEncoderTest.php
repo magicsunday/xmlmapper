@@ -13,6 +13,7 @@ namespace MagicSunday\Test;
 
 use Doctrine\Common\Annotations\AnnotationException;
 use MagicSunday\Test\Fixture\Author;
+use MagicSunday\Test\Fixture\BodyHost;
 use MagicSunday\Test\Fixture\Book;
 use MagicSunday\Test\Fixture\Chapter;
 use MagicSunday\Test\Fixture\Comment;
@@ -201,6 +202,27 @@ class XmlEncoderTest extends TestCase
         $this->expectException(AnnotationException::class);
 
         $this->getXmlEncoder()->map(new ForeignDocblockOnly());
+    }
+
+    /**
+     * Two classes that share a property name but carry divergent markers are
+     * resolved independently within one document: the marker cache is keyed by
+     * class and property, not by property name alone. Comment::body is a CDATA
+     * section while PlainBody::body has no marker, so the latter's markup is
+     * escaped rather than served Comment's cached CDATA map (and vice versa).
+     */
+    #[Test]
+    public function resolvesMarkersPerClassNotByPropertyNameAlone(): void
+    {
+        $xml = (string) $this->getXmlEncoder()->map(new BodyHost());
+
+        // Comment::body keeps its CDATA section ...
+        self::assertStringContainsString('<![CDATA[<b>hi</b>]]>', $xml);
+
+        // ... while PlainBody::body, sharing the property name, is escaped as a
+        // plain element. A property-name-only cache key would collapse both to
+        // the same marker and break one of these.
+        self::assertStringContainsString('<body>&lt;b&gt;hi&lt;/b&gt;</body>', $xml);
     }
 
     /**
