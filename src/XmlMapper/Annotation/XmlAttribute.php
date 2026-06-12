@@ -12,7 +12,6 @@ declare(strict_types=1);
 namespace MagicSunday\XmlMapper\Annotation;
 
 use Attribute;
-use Doctrine\Common\Annotations\Annotation;
 
 /**
  * This annotation is used to inform the XmlMapper that the property should be added
@@ -28,6 +27,6 @@ use Doctrine\Common\Annotations\Annotation;
  * @Target({"PROPERTY"})
  */
 #[Attribute(Attribute::TARGET_PROPERTY)]
-final class XmlAttribute extends Annotation
+final class XmlAttribute
 {
 }
