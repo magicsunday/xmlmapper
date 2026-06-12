@@ -24,17 +24,9 @@ use MagicSunday\XmlSerializable;
  */
 class Price implements XmlSerializable
 {
-    /**
-     * @XmlAttribute
-     *
-     * @var string
-     */
+    #[XmlAttribute]
     public string $currency = 'EUR';
 
-    /**
-     * @XmlNodeValue
-     *
-     * @var string
-     */
+    #[XmlNodeValue]
     public string $amount = '42.00';
 }

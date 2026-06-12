@@ -16,7 +16,7 @@ use MagicSunday\XmlSerializable;
 
 /**
  * A fixture using the native PHP 8 attribute syntax for the XmlCDataSection
- * marker instead of the Doctrine docblock annotation.
+ * marker.
  *
  * @author  Rico Sonntag <mail@ricosonntag.de>
  * @license https://opensource.org/licenses/MIT

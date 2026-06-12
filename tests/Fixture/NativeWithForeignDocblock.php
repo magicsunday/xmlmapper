@@ -16,8 +16,8 @@ use MagicSunday\XmlSerializable;
 
 /**
  * A fixture whose property uses a native marker and additionally carries an
- * unrelated, unimported docblock annotation from another library. The encoder
- * must not fail when the Doctrine reader cannot resolve that foreign annotation.
+ * unrelated docblock annotation from another library. The encoder inspects only
+ * native attributes, so the stray docblock annotation must not affect the output.
  *
  * @author  Rico Sonntag <mail@ricosonntag.de>
  * @license https://opensource.org/licenses/MIT

@@ -17,7 +17,7 @@ use MagicSunday\XmlSerializable;
 
 /**
  * A fixture using the native PHP 8 attribute syntax for the XmlAttribute and
- * XmlNodeValue markers instead of the Doctrine docblock annotation.
+ * XmlNodeValue markers.
  *
  * @author  Rico Sonntag <mail@ricosonntag.de>
  * @license https://opensource.org/licenses/MIT
