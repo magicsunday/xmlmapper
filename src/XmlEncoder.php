@@ -34,6 +34,7 @@ use Symfony\Component\TypeInfo\Type\ObjectType;
 use Symfony\Component\TypeInfo\Type\WrappingTypeInterface;
 use Symfony\Component\TypeInfo\TypeIdentifier;
 
+use function array_fill_keys;
 use function array_key_exists;
 use function is_bool;
 use function is_iterable;
@@ -422,11 +423,7 @@ class XmlEncoder
             return $this->markerCache[$cacheKey];
         }
 
-        $markers = [
-            XmlAttribute::class    => false,
-            XmlNodeValue::class    => false,
-            XmlCDataSection::class => false,
-        ];
+        $markers = array_fill_keys(self::MARKER_ANNOTATIONS, false);
 
         $reflectionProperty = $this->getReflectionProperty($className, $propertyName);
 
