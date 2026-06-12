@@ -41,8 +41,7 @@ that should be encoded recursively — must implement it. It declares no methods
 
 ## Property markers
 
-Each marker can be applied either as a **native PHP attribute** or as a **Doctrine
-docblock annotation**; both are recognised. See [Markers](recipes/markers.md).
+Each marker is applied as a **native PHP attribute**. See [Markers](recipes/markers.md).
 
 | Marker                                        | Effect                                                              |
 |-----------------------------------------------|--------------------------------------------------------------------|

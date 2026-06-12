@@ -12,7 +12,6 @@ declare(strict_types=1);
 namespace MagicSunday;
 
 use Closure;
-use Doctrine\Common\Annotations\AnnotationReader;
 use DOMDocument;
 use DOMElement;
 use DOMException;
@@ -54,7 +53,7 @@ class XmlEncoder
      *
      * @var list<class-string>
      */
-    private const MARKER_ANNOTATIONS = [
+    private const array MARKER_ANNOTATIONS = [
         XmlAttribute::class,
         XmlNodeValue::class,
         XmlCDataSection::class,
@@ -92,13 +91,6 @@ class XmlEncoder
      * @var array<string, Closure>
      */
     private array $types = [];
-
-    /**
-     * The lazily created Doctrine annotation reader, shared across property checks.
-     *
-     * @var AnnotationReader|null
-     */
-    private ?AnnotationReader $annotationReader = null;
 
     /**
      * The resolved marker annotations memoised per "class::property" key.
@@ -381,9 +373,8 @@ class XmlEncoder
     }
 
     /**
-     * Returns TRUE if the property carries the given marker, applied either as a
-     * native PHP attribute (#[XmlAttribute]) or as a Doctrine docblock annotation
-     * (@XmlAttribute).
+     * Returns TRUE if the property carries the given marker, applied as a native
+     * PHP attribute (#[XmlAttribute]).
      *
      * @param class-string $className      The class name of the initial element
      * @param string       $propertyName   The name of the property
@@ -397,15 +388,9 @@ class XmlEncoder
     }
 
     /**
-     * Resolves which marker annotations a property carries and memoises the result
-     * per "class::property" key, so the reflection lookup and the docblock parse
-     * run once per property rather than once per marker check per encoded object.
-     *
-     * A property that opts into the native attribute syntax for any marker is not
-     * read from the docblock: this keeps an unrelated foreign docblock annotation
-     * from breaking an already-natively-annotated property, while a genuinely
-     * fumbled docblock marker (e.g. a forgotten use import) on a docblock-only
-     * property still fails loudly.
+     * Resolves which marker attributes a property carries and memoises the result
+     * per "class::property" key, so the reflection lookup runs once per property
+     * rather than once per marker check per encoded object.
      *
      * @param class-string $className    The class name of the initial element
      * @param string       $propertyName The name of the property
@@ -428,30 +413,9 @@ class XmlEncoder
             return $this->markerCache[$cacheKey] = $markers;
         }
 
-        // Native PHP attribute syntax
-        $hasNativeMarker = false;
-
         foreach (self::MARKER_ANNOTATIONS as $marker) {
             if ($reflectionProperty->getAttributes($marker, ReflectionAttribute::IS_INSTANCEOF) !== []) {
                 $markers[$marker] = true;
-                $hasNativeMarker  = true;
-            }
-        }
-
-        if ($hasNativeMarker) {
-            return $this->markerCache[$cacheKey] = $markers;
-        }
-
-        // Doctrine docblock annotation syntax
-        $this->annotationReader ??= new AnnotationReader();
-
-        foreach ($this->annotationReader->getPropertyAnnotations($reflectionProperty) as $annotation) {
-            foreach (self::MARKER_ANNOTATIONS as $marker) {
-                if ($annotation instanceof $marker) {
-                    $markers[$marker] = true;
-
-                    break;
-                }
             }
         }
 

@@ -23,11 +23,7 @@ use MagicSunday\XmlSerializable;
  */
 class Book implements XmlSerializable
 {
-    /**
-     * @XmlAttribute
-     *
-     * @var string
-     */
+    #[XmlAttribute]
     public string $isbn = '978-3-16-148410-0';
 
     /**

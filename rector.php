@@ -71,7 +71,7 @@ return static function (RectorConfig $rectorConfig): void {
         SetList::PRIVATIZATION,
         SetList::STRICT_BOOLEANS,
         SetList::TYPE_DECLARATION,
-        LevelSetList::UP_TO_PHP_82,
+        LevelSetList::UP_TO_PHP_83,
     ]);
 
     // Skip some rules

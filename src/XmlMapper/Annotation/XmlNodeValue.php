@@ -14,18 +14,13 @@ namespace MagicSunday\XmlMapper\Annotation;
 use Attribute;
 
 /**
- * This annotation is used to inform the XmlMapper that when converting to XML,
- * the property should be added directly as the content of the XML element. It can
- * be applied either as a native PHP attribute (#[XmlNodeValue]) or as a Doctrine
- * docblock annotation (@XmlNodeValue).
+ * This attribute informs the XmlMapper that when converting to XML, the property
+ * should be added directly as the content of the XML element. Apply it as a native
+ * PHP attribute (#[XmlNodeValue]).
  *
  * @author  Rico Sonntag <mail@ricosonntag.de>
  * @license https://opensource.org/licenses/MIT
  * @link    https://github.com/magicsunday/xmlmapper/
- *
- * @Annotation
- *
- * @Target({"PROPERTY"})
  */
 #[Attribute(Attribute::TARGET_PROPERTY)]
 final class XmlNodeValue

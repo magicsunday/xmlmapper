@@ -14,20 +14,19 @@
         "issues": "https://github.com/magicsunday/xmlmapper/issues"
     },
     "require": {
-        "php": "^8.2",
+        "php": "^8.3",
         "ext-xml": "*",
         "ext-dom": "*",
         "symfony/property-info": "^7.3 || ^8.0",
         "symfony/property-access": "^7.3 || ^8.0",
         "symfony/type-info": "^7.3 || ^8.0",
-        "doctrine/inflector": "^2.0",
-        "doctrine/annotations": "^2.0"
+        "doctrine/inflector": "^2.0"
     },
     "require-dev": {
         "phpdocumentor/reflection-docblock": "^5.0 || ^6.0",
         "friendsofphp/php-cs-fixer": "^3.65",
         "overtrue/phplint": "^9.0",
-        "phpunit/phpunit": "^11.0 || ^12.0 || ^13.0",
+        "phpunit/phpunit": "^12.0 || ^13.0",
         "phpstan/phpstan": "^2.0",
         "phpstan/phpstan-phpunit": "^2.0",
         "phpstan/phpstan-strict-rules": "^2.0",

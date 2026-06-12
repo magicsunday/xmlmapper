@@ -1,15 +1,13 @@
 # Markers: attributes, node values and CDATA
 
 By default every property becomes a child element. Three markers change that for an
-individual property. Each marker can be written as a **native PHP attribute** or as
-a **Doctrine docblock annotation** — both are recognised, so you can adopt the
-native syntax incrementally.
+individual property. Each marker is written as a **native PHP attribute**.
 
-| Marker             | Native syntax        | Docblock syntax     | Effect                                            |
-|--------------------|----------------------|---------------------|---------------------------------------------------|
-| `XmlAttribute`     | `#[XmlAttribute]`    | `@XmlAttribute`     | Value becomes an attribute of the element.        |
-| `XmlNodeValue`     | `#[XmlNodeValue]`    | `@XmlNodeValue`     | Value becomes the element's raw text content.     |
-| `XmlCDataSection`  | `#[XmlCDataSection]` | `@XmlCDataSection`  | Value is wrapped in `<![CDATA[ … ]]>`.            |
+| Marker             | Syntax               | Effect                                            |
+|--------------------|----------------------|---------------------------------------------------|
+| `XmlAttribute`     | `#[XmlAttribute]`    | Value becomes an attribute of the element.        |
+| `XmlNodeValue`     | `#[XmlNodeValue]`    | Value becomes the element's raw text content.     |
+| `XmlCDataSection`  | `#[XmlCDataSection]` | Value is wrapped in `<![CDATA[ … ]]>`.            |
 
 All three target a property.
 
@@ -38,23 +36,6 @@ final class Price implements XmlSerializable
 ```xml
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <price currency="EUR">42.00</price>
-```
-
-The equivalent docblock form produces identical output:
-
-```php
-final class Price implements XmlSerializable
-{
-    /**
-     * @XmlAttribute
-     */
-    public string $currency = 'EUR';
-
-    /**
-     * @XmlNodeValue
-     */
-    public string $amount = '42.00';
-}
 ```
 
 ## CDATA section

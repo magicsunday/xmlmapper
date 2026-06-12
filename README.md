@@ -12,14 +12,14 @@
 <!-- Row 2: Standards / Tooling badges -->
 <p align="center">
   <a href="https://phpstan.org/"><img src="https://img.shields.io/badge/PHPStan-max%20level-brightgreen.svg" alt="PHPStan Max Level"></a>
-  <a href="https://phpunit.de/"><img src="https://img.shields.io/badge/PHPUnit-11%20%7C%2012%20%7C%2013-blue.svg" alt="PHPUnit 11 | 12 | 13"></a>
+  <a href="https://phpunit.de/"><img src="https://img.shields.io/badge/PHPUnit-12%20%7C%2013-blue.svg" alt="PHPUnit 12 | 13"></a>
   <a href="https://getrector.com/"><img src="https://img.shields.io/badge/Rector-2.0-orange.svg" alt="Rector 2.0"></a>
   <a href="https://www.php-fig.org/per/coding-style/"><img src="https://img.shields.io/badge/Code%20Style-PER--CS%202.0-blue.svg" alt="PER-CS 2.0"></a>
 </p>
 
 <!-- Row 3: Compatibility badges -->
 <p align="center">
-  <a href="composer.json"><img src="https://img.shields.io/badge/php-8.2%20%7C%208.3%20%7C%208.4%20%7C%208.5-blue" alt="PHP Version"></a>
+  <a href="composer.json"><img src="https://img.shields.io/badge/php-8.3%20%7C%208.4%20%7C%208.5-blue" alt="PHP Version"></a>
 </p>
 
 <!-- Row 4: Project badges -->
@@ -36,7 +36,7 @@ XmlMapper is a PHP library that maps strongly-typed PHP objects (DTOs, value obj
 | Key      | Value                                              |
 |----------|----------------------------------------------------|
 | Package  | `magicsunday/xmlmapper`                            |
-| PHP      | `^8.2`                                             |
+| PHP      | `^8.3`                                             |
 | Main API | `MagicSunday\XmlEncoder`                           |
 | Output   | XML string (`string`), or `false` on failure       |
 
@@ -131,8 +131,7 @@ The name converter is optional; without it the raw class and property names are 
 
 ### Property markers
 
-Each marker can be applied as a native PHP attribute (shown above) or as the
-equivalent Doctrine docblock annotation (`@XmlAttribute`); both are recognised.
+Each marker is applied as a native PHP attribute (shown above).
 
 | Marker             | Effect                                                              |
 |--------------------|--------------------------------------------------------------------|
@@ -153,7 +152,7 @@ $encoder->addType('bool', static fn (string $name, mixed $value): string => $val
 * [API reference](docs/API.md)
 * Recipes
   * [Manual instantiation](docs/recipes/manual-instantiation.md) — wiring the Symfony extractor and name converter
-  * [Markers: attributes, node values and CDATA](docs/recipes/markers.md) — native attribute and docblock syntax
+  * [Markers: attributes, node values and CDATA](docs/recipes/markers.md) — native attribute syntax
   * [Custom types](docs/recipes/type-converters.md) — transforming values with `addType()`
   * [Custom name converter](docs/recipes/custom-name-converter.md) — element naming
   * [Collections](docs/recipes/collections.md) — scalar, object, nullable and union-typed collections
@@ -162,7 +161,7 @@ $encoder->addType('bool', static fn (string $name, mixed $value): string => $val
 
 Prerequisites:
 
-- PHP `^8.2`
+- PHP `^8.3`
 - Extensions: `dom`, `xml`
 - Node.js (for the copy-paste detection gate, run via `npx`)
 

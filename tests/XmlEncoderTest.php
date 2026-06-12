@@ -11,14 +11,12 @@ declare(strict_types=1);
 
 namespace MagicSunday\Test;
 
-use Doctrine\Common\Annotations\AnnotationException;
 use MagicSunday\Test\Fixture\Author;
 use MagicSunday\Test\Fixture\BodyHost;
 use MagicSunday\Test\Fixture\Book;
 use MagicSunday\Test\Fixture\Chapter;
 use MagicSunday\Test\Fixture\Comment;
 use MagicSunday\Test\Fixture\CustomTypeHost;
-use MagicSunday\Test\Fixture\ForeignDocblockOnly;
 use MagicSunday\Test\Fixture\NativeCData;
 use MagicSunday\Test\Fixture\NativeMarkers;
 use MagicSunday\Test\Fixture\NativeWithForeignDocblock;
@@ -150,9 +148,8 @@ class XmlEncoderTest extends TestCase
     }
 
     /**
-     * The XmlAttribute and XmlNodeValue markers are also recognised when applied
-     * with the native PHP 8 attribute syntax, producing the same output as the
-     * Doctrine docblock annotation.
+     * The XmlAttribute and XmlNodeValue markers are recognised when applied with
+     * the native PHP 8 attribute syntax.
      */
     #[Test]
     public function encodesNativeAttributeAndNodeValueMarkers(): void
@@ -176,9 +173,9 @@ class XmlEncoderTest extends TestCase
     }
 
     /**
-     * A property that uses a native marker and additionally carries an unrelated,
-     * unimported docblock annotation is encoded without failing, regardless of
-     * which marker is queried first.
+     * A property that uses a native marker and additionally carries an unrelated
+     * docblock annotation from another library is encoded without failing: only
+     * native attributes are inspected, so the stray docblock is simply ignored.
      */
     #[Test]
     public function encodesNativeMarkerAlongsideForeignDocblockAnnotation(): void
@@ -189,19 +186,6 @@ class XmlEncoderTest extends TestCase
             '<nativeWithForeignDocblock><![CDATA[<b>hi</b>]]></nativeWithForeignDocblock>',
             $xml
         );
-    }
-
-    /**
-     * A docblock-only property whose annotation the reader cannot resolve fails
-     * loudly instead of being silently mis-encoded, so a fumbled marker (e.g. a
-     * forgotten use import) is not swallowed.
-     */
-    #[Test]
-    public function failsLoudlyForUnresolvableDocblockWithoutNativeMarker(): void
-    {
-        $this->expectException(AnnotationException::class);
-
-        $this->getXmlEncoder()->map(new ForeignDocblockOnly());
     }
 
     /**

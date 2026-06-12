@@ -23,10 +23,6 @@ use MagicSunday\XmlSerializable;
  */
 class Comment implements XmlSerializable
 {
-    /**
-     * @XmlCDataSection
-     *
-     * @var string
-     */
+    #[XmlCDataSection]
     public string $body = '<b>hi</b>';
 }
