@@ -12,7 +12,6 @@ declare(strict_types=1);
 namespace MagicSunday\XmlMapper\Annotation;
 
 use Attribute;
-use Doctrine\Common\Annotations\Annotation;
 
 /**
  * This annotation is used to inform the XmlMapper that when converting to XML,
@@ -29,6 +28,6 @@ use Doctrine\Common\Annotations\Annotation;
  * @Target({"PROPERTY"})
  */
 #[Attribute(Attribute::TARGET_PROPERTY)]
-final class XmlNodeValue extends Annotation
+final class XmlNodeValue
 {
 }
