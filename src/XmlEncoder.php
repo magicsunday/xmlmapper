@@ -431,8 +431,6 @@ class XmlEncoder
      *
      * @param class-string $className    The class name of the initial element
      * @param string       $propertyName The name of the property
-     *
-     * @return ReflectionProperty|null
      */
     private function getReflectionProperty(string $className, string $propertyName): ?ReflectionProperty
     {
@@ -542,8 +540,6 @@ class XmlEncoder
      * rendered as their integer value; anything that is neither scalar nor
      * Stringable yields an empty string.
      *
-     * @param mixed $propertyValue
-     *
      * @return string
      */
     private function encodeValue(mixed $propertyValue): string
@@ -599,10 +595,7 @@ class XmlEncoder
      * Call the custom closure for the specified type.
      *
      * @param string $propertyName
-     * @param mixed  $propertyValue
      * @param string $typeName
-     *
-     * @return mixed
      */
     private function callCustomClosure(string $propertyName, mixed $propertyValue, string $typeName): mixed
     {
