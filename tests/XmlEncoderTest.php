@@ -33,6 +33,7 @@ use MagicSunday\Test\Fixture\NativeMarkers;
 use MagicSunday\Test\Fixture\NativeWithForeignAttribute;
 use MagicSunday\Test\Fixture\NativeWithForeignDocblock;
 use MagicSunday\Test\Fixture\Person;
+use MagicSunday\Test\Fixture\PlainArrayHost;
 use MagicSunday\Test\Fixture\PlainBody;
 use MagicSunday\Test\Fixture\Price;
 use MagicSunday\Test\Fixture\SerializableMoney;
@@ -42,6 +43,7 @@ use MagicSunday\Test\Fixture\SpecialMoneyHost;
 use MagicSunday\Test\Fixture\UninitializedHost;
 use MagicSunday\Test\Fixture\UnionObjectHost;
 use MagicSunday\Test\Fixture\UnionProperty;
+use MagicSunday\Test\Fixture\UnmarkedNested;
 use MagicSunday\Test\Fixture\VisibilityHost;
 use MagicSunday\XmlEncoder;
 use MagicSunday\XmlMapper\Annotation\XmlAttribute;
@@ -450,32 +452,69 @@ class XmlEncoderTest extends TestCase
     }
 
     /**
-     * The encoding boundary is drawn by the list extractor, not by the
-     * visibility of the backing field, and values are then read as fields.
+     * An array property without a `@var` annotation is recognised as a
+     * collection as long as a type extractor reads native types.
      *
-     * Both halves matter and they disagree in one direction: a private field
-     * with a public accessor IS reported by ReflectionExtractor and therefore
-     * encoded, while a purely virtual accessor has no field to read and is
-     * dropped. Accessor transformations are consequently not applied.
+     * With only PhpDocExtractor the type resolves to nothing, falls back to
+     * string, and the entries are dropped into a single empty element without
+     * any error — which is why the documented configuration lists both.
      */
     #[Test]
-    public function encodesWhatTheExtractorReportsAndReadsItAsAField(): void
+    public function encodesAnArrayPropertyWithoutADocblock(): void
     {
-        $xml = (string) $this->getXmlEncoder()->map(new VisibilityHost());
+        self::assertXmlStringEqualsXmlString(
+            <<<'XML'
+                <?xml version="1.0" encoding="UTF-8"?>
+                <plainArrayHost>
+                    <tags>a</tags>
+                    <tags>b</tags>
+                </plainArrayHost>
+                XML,
+            (string) $this->getXmlEncoder()->map(new PlainArrayHost())
+        );
+    }
+
+    /**
+     * Only PhpDocExtractor: the same property loses its entries. Pinned so the
+     * cost of dropping ReflectionExtractor from the type extractors stays
+     * visible instead of surfacing as missing data in production.
+     */
+    #[Test]
+    public function losesArrayEntriesWhenNoTypeExtractorReadsNativeTypes(): void
+    {
+        $extractor = new PropertyInfoExtractor(
+            [new ReflectionExtractor()],
+            [new PhpDocExtractor()]
+        );
 
         self::assertXmlStringEqualsXmlString(
             <<<'XML'
                 <?xml version="1.0" encoding="UTF-8"?>
-                <visibilityHost>
-                    <visible>public</visible>
-                    <hidden>private-with-getter</hidden>
-                    <transformed>from-field</transformed>
-                </visibilityHost>
+                <PlainArrayHost>
+                    <tags/>
+                </PlainArrayHost>
                 XML,
-            $xml
+            (string) (new XmlEncoder($extractor))->map(new PlainArrayHost())
         );
+    }
 
-        self::assertStringNotContainsString('computed', $xml);
+    /**
+     * A nested object that does not implement XmlSerializable renders as an
+     * empty element rather than raising anything. Pinned because it is the most
+     * likely mistake when adding a node type, and the symptom points nowhere.
+     */
+    #[Test]
+    public function rendersANestedObjectWithoutTheMarkerInterfaceAsEmpty(): void
+    {
+        self::assertXmlStringEqualsXmlString(
+            <<<'XML'
+                <?xml version="1.0" encoding="UTF-8"?>
+                <unmarkedNested>
+                    <inner/>
+                </unmarkedNested>
+                XML,
+            (string) $this->getXmlEncoder()->map(new UnmarkedNested())
+        );
     }
 
     /**
@@ -744,6 +783,35 @@ class XmlEncoderTest extends TestCase
                 XML,
             (string) $xml
         );
+    }
+
+    /**
+     * The encoding boundary is drawn by the list extractor, not by the
+     * visibility of the backing field, and values are then read as fields.
+     *
+     * Both halves matter and they disagree in one direction: a private field
+     * with a public accessor IS reported by ReflectionExtractor and therefore
+     * encoded, while a purely virtual accessor has no field to read and is
+     * dropped. Accessor transformations are consequently not applied.
+     */
+    #[Test]
+    public function encodesWhatTheExtractorReportsAndReadsItAsAField(): void
+    {
+        $xml = (string) $this->getXmlEncoder()->map(new VisibilityHost());
+
+        self::assertXmlStringEqualsXmlString(
+            <<<'XML'
+                <?xml version="1.0" encoding="UTF-8"?>
+                <visibilityHost>
+                    <visible>public</visible>
+                    <hidden>private-with-getter</hidden>
+                    <transformed>from-field</transformed>
+                </visibilityHost>
+                XML,
+            $xml
+        );
+
+        self::assertStringNotContainsString('computed', $xml);
     }
 
     /**
