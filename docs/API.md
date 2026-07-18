@@ -25,7 +25,7 @@ names.
 
 The root element is named after the object's short class name (passed through the
 name converter when one is configured). Properties with a `null` value are
-skipped.
+skipped, as are typed properties that were never assigned.
 
 ### `addType(string $type, Closure $closure): $this`
 
@@ -57,5 +57,5 @@ public function convert(string $name): string;
 
 Receives a raw class or property name and returns the element name to use.
 `CamelCasePropertyNameConverter` is the bundled implementation (snake_case →
-camelCase via Symfony's inflector). See
+camelCase via Doctrine's inflector). See
 [Custom name converter](recipes/custom-name-converter.md).

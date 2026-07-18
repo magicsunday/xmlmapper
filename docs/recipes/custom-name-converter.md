@@ -17,7 +17,7 @@ once per property name.
 
 ## Bundled converter
 
-`CamelCasePropertyNameConverter` turns snake_case into camelCase using Symfony's
+`CamelCasePropertyNameConverter` turns snake_case into camelCase using Doctrine's
 inflector, so `home_town` becomes `homeTown` and a class `Person` becomes `person`.
 
 ```php

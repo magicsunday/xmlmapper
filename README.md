@@ -1,7 +1,7 @@
 <h1 align="center">XmlMapper: PHP Object to XML Mapping</h1>
 
 <p align="center">
-  Map strongly-typed PHP objects to XML using Symfony's PropertyInfo, PropertyAccess and TypeInfo components.
+  Map strongly-typed PHP objects to XML using Symfony's PropertyInfo and TypeInfo components.
 </p>
 
 <!-- Row 1: CI / Quality badges -->
@@ -31,7 +31,7 @@
 ---
 
 ## 📌 Overview
-XmlMapper is a PHP library that maps strongly-typed PHP objects (DTOs, value objects, entities) to XML using reflection and PHPDoc annotations. It leverages Symfony's PropertyInfo, PropertyAccess and TypeInfo components to derive each property's type and render a matching XML document.
+XmlMapper is a PHP library that maps strongly-typed PHP objects (DTOs, value objects, entities) to XML using reflection and PHPDoc annotations. It leverages Symfony's PropertyInfo and TypeInfo components to derive each property's type and render a matching XML document.
 
 | Key      | Value                                              |
 |----------|----------------------------------------------------|
