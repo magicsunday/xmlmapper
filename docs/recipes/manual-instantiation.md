@@ -6,8 +6,8 @@ own extractors or name converter.
 
 ## Default wiring
 
-A `PropertyInfoExtractor` built from a `ReflectionExtractor` (property list) and a
-`PhpDocExtractor` (PHPDoc types) covers the common case:
+A `PropertyInfoExtractor` built from a `ReflectionExtractor` for the property list
+and **both** extractors for the types covers the common case:
 
 ```php
 use MagicSunday\XmlEncoder;
