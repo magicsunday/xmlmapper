@@ -444,9 +444,13 @@ class XmlEncoderTest extends TestCase
     #[Test]
     public function producesTheExactDocumentBytes(): void
     {
+        // Own encoder purely to skip the name converter, so the expected bytes
+        // carry the raw class short name. Author annotates its property, so one
+        // type extractor suffices — no unexplained variance in a test whose
+        // entire purpose is exactness.
         $extractor = new PropertyInfoExtractor(
             [new ReflectionExtractor()],
-            [new PhpDocExtractor(), new ReflectionExtractor()]
+            [new PhpDocExtractor()]
         );
 
         self::assertSame(
@@ -469,13 +473,21 @@ class XmlEncoderTest extends TestCase
     {
         $extractor = new PropertyInfoExtractor(
             [new ReflectionExtractor()],
-            [new PhpDocExtractor(), new ReflectionExtractor()]
+            [new PhpDocExtractor()]
         );
 
         $converter = new class implements PropertyNameConverterInterface {
+            /**
+             * Leaves the root element name alone and produces a leading digit
+             * for every property name, which is not valid for an XML element.
+             *
+             * @param string $name Raw class or property name
+             *
+             * @return string
+             */
             public function convert(string $name): string
             {
-                return '1' . $name;
+                return $name === 'Author' ? $name : '1' . $name;
             }
         };
 
