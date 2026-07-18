@@ -71,6 +71,14 @@ class does not fire for a property declared as a subclass. A collection of
 that class (`@var Money[]`) likewise resolves to the builtin key `array`, so the class
 closure is not applied per entry — and because `Money` does not implement
 `XmlSerializable`, each entry then renders as an empty element without an error.
+
+If the class **does** implement `XmlSerializable`, a missed class key is not
+harmless: the encoder walks the object and writes out every property the
+extractor reports. A closure registered to redact or format a value therefore
+emits the untouched contents instead. Do not rely on `addType()` to keep a value
+out of the output — neither for a collection of that class, nor for a property
+declared as a subclass or an interface.
+
 Register the collection under `array` and convert the entries yourself:
 
 ```php

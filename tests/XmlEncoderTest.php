@@ -26,6 +26,8 @@ use MagicSunday\Test\Fixture\NativeWithForeignAttribute;
 use MagicSunday\Test\Fixture\NativeWithForeignDocblock;
 use MagicSunday\Test\Fixture\Person;
 use MagicSunday\Test\Fixture\Price;
+use MagicSunday\Test\Fixture\SerializableMoney;
+use MagicSunday\Test\Fixture\SerializableMoneyBag;
 use MagicSunday\Test\Fixture\SpecialMoney;
 use MagicSunday\Test\Fixture\SpecialMoneyHost;
 use MagicSunday\Test\Fixture\UnionObjectHost;
@@ -539,5 +541,29 @@ class XmlEncoderTest extends TestCase
                 XML,
             (string) $xml
         );
+    }
+
+    /**
+     * The costly half of the collection boundary.
+     *
+     * A missed class key is harmless only while the class does not implement
+     * the marker interface — then the entry renders empty. Implement it, and the
+     * encoder walks the object instead, so a closure registered to redact or
+     * format a value silently emits the untouched contents. That is fail-open,
+     * and it is the shape a domain value object most plausibly has.
+     */
+    #[Test]
+    public function walksTheEntriesWhenAMissedClassKeyMeetsTheMarkerInterface(): void
+    {
+        $encoder = $this->getXmlEncoder()
+            ->addType(SerializableMoney::class, static fn (string $name, SerializableMoney $value): string => '[redacted]');
+
+        $result = (string) $encoder->map(new SerializableMoneyBag());
+
+        // The closure did not fire ...
+        self::assertStringNotContainsString('[redacted]', $result);
+
+        // ... and the value it was meant to replace is in the output instead.
+        self::assertStringContainsString('1250', $result);
     }
 }
