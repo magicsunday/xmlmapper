@@ -601,8 +601,6 @@ class XmlEncoder
      * converter for a single class impossible to express.
      *
      * @param Type $type The resolved property type
-     *
-     * @return string|null
      */
     private function getCustomTypeKey(Type $type): ?string
     {
