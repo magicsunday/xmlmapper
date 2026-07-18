@@ -28,6 +28,10 @@ class UnmarkedNested implements XmlSerializable
      */
     public object $inner;
 
+    /**
+     * Seeds the nested object with an anonymous class that does not implement
+     * the marker interface.
+     */
     public function __construct()
     {
         $this->inner = new class {

@@ -23,5 +23,13 @@ use MagicSunday\XmlSerializable;
  */
 class PlainArrayHost implements XmlSerializable
 {
+    /**
+     * Deliberately carries no `@var` annotation: the fixture exists to show how
+     * an array property behaves when the type extractors cannot resolve a value
+     * type. `@phpstan-var` satisfies static analysis without changing that —
+     * PhpDocExtractor only reads `var`, `param` and `return`.
+     *
+     * @phpstan-var list<string>
+     */
     public array $tags = ['a', 'b'];
 }
