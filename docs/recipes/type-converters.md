@@ -77,7 +77,9 @@ harmless: the encoder walks the object and writes out every property the
 extractor reports. A closure registered to redact or format a value therefore
 emits the untouched contents instead. Do not rely on `addType()` to keep a value
 out of the output — neither for a collection of that class, nor for a property
-declared as a subclass or an interface.
+declared as a subclass. Registering under an interface does work, but only when
+the property is itself declared as that interface: the lookup compares the
+registered name against the declared one, so the rule is the same in every case.
 
 Register the collection under `array` and convert the entries yourself:
 
