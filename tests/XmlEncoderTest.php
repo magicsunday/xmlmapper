@@ -17,6 +17,8 @@ use MagicSunday\Test\Fixture\Book;
 use MagicSunday\Test\Fixture\Chapter;
 use MagicSunday\Test\Fixture\Comment;
 use MagicSunday\Test\Fixture\CustomTypeHost;
+use MagicSunday\Test\Fixture\Money;
+use MagicSunday\Test\Fixture\MoneyHost;
 use MagicSunday\Test\Fixture\NativeCData;
 use MagicSunday\Test\Fixture\NativeMarkers;
 use MagicSunday\Test\Fixture\NativeWithForeignAttribute;
@@ -427,6 +429,60 @@ class XmlEncoderTest extends TestCase
                 </unionObjectHost>
                 XML,
             (string) $this->getXmlEncoder()->map($host)
+        );
+    }
+
+    /**
+     * A custom type registered under a class name applies to properties of that
+     * class only.
+     *
+     * The lookup key used to be the builtin type name, which collapses every
+     * object to "object" — so the obvious use case (a converter for one value
+     * object) could not be expressed without also hijacking every other object
+     * property in the model.
+     */
+    #[Test]
+    public function appliesACustomTypeRegisteredUnderAClassName(): void
+    {
+        $xml = $this->getXmlEncoder()
+            ->addType(Money::class, static fn (string $name, mixed $value): string => '12.50 EUR')
+            ->map(new MoneyHost());
+
+        self::assertXmlStringEqualsXmlString(
+            <<<'XML'
+                <?xml version="1.0" encoding="UTF-8"?>
+                <moneyHost>
+                    <amount>12.50 EUR</amount>
+                    <author>
+                        <name>Jane Doe</name>
+                    </author>
+                </moneyHost>
+                XML,
+            (string) $xml
+        );
+    }
+
+    /**
+     * The builtin key keeps working as the catch-all, and the class-specific
+     * registration wins over it when both are present.
+     */
+    #[Test]
+    public function prefersTheClassSpecificCustomTypeOverTheBuiltinCatchAll(): void
+    {
+        $xml = $this->getXmlEncoder()
+            ->addType('object', static fn (string $name, mixed $value): string => 'any-object')
+            ->addType(Money::class, static fn (string $name, mixed $value): string => 'money')
+            ->map(new MoneyHost());
+
+        self::assertXmlStringEqualsXmlString(
+            <<<'XML'
+                <?xml version="1.0" encoding="UTF-8"?>
+                <moneyHost>
+                    <amount>money</amount>
+                    <author>any-object</author>
+                </moneyHost>
+                XML,
+            (string) $xml
         );
     }
 }

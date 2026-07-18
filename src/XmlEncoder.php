@@ -184,13 +184,13 @@ class XmlEncoder
             $property      = $reflection->getProperty($propertyName);
             $propertyValue = $property->getValue($instance);
             $propertyType  = $this->getType($className, $propertyName);
-            $builtinType   = $this->getBuiltinTypeName($propertyType);
+            $customTypeKey = $this->getCustomTypeKey($propertyType);
 
-            if ($this->isCustomType($builtinType)) {
+            if ($customTypeKey !== null) {
                 $propertyValue = $this->callCustomClosure(
                     $propertyName,
                     $propertyValue,
-                    $builtinType
+                    $customTypeKey
                 );
             }
 
@@ -589,6 +589,32 @@ class XmlEncoder
     private function isCustomType(string $typeName): bool
     {
         return array_key_exists($typeName, $this->types);
+    }
+
+    /**
+     * Returns the key under which a custom type is registered for the given
+     * property type, or NULL when none applies.
+     *
+     * The fully qualified class name is tried first so a converter can target
+     * one value object; the builtin name stays available as the catch-all.
+     * Without the first step every object collapses to "object", which makes a
+     * converter for a single class impossible to express.
+     *
+     * @param Type $type The resolved property type
+     *
+     * @return string|null
+     */
+    private function getCustomTypeKey(Type $type): ?string
+    {
+        $baseType = $this->getBaseType($type);
+
+        if (($baseType instanceof ObjectType) && $this->isCustomType($baseType->getClassName())) {
+            return $baseType->getClassName();
+        }
+
+        $builtinType = $this->getBuiltinTypeName($type);
+
+        return $this->isCustomType($builtinType) ? $builtinType : null;
     }
 
     /**
