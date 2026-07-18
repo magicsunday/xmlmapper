@@ -20,9 +20,11 @@ use MagicSunday\Test\Fixture\Book;
 use MagicSunday\Test\Fixture\Chapter;
 use MagicSunday\Test\Fixture\Comment;
 use MagicSunday\Test\Fixture\CustomTypeHost;
+use MagicSunday\Test\Fixture\InterfaceMoneyHost;
 use MagicSunday\Test\Fixture\Money;
 use MagicSunday\Test\Fixture\MoneyBag;
 use MagicSunday\Test\Fixture\MoneyHost;
+use MagicSunday\Test\Fixture\MoneyLike;
 use MagicSunday\Test\Fixture\NativeCData;
 use MagicSunday\Test\Fixture\NativeMarkers;
 use MagicSunday\Test\Fixture\NativeWithForeignAttribute;
@@ -497,8 +499,8 @@ class XmlEncoderTest extends TestCase
     }
 
     /**
-     * The class key is matched exactly against the property's declared type —
-     * no parent or interface resolution, and no unwrapping of a collection.
+     * The registered name is compared against the property's declared type —
+     * the hierarchy is not walked, and a collection is not unwrapped.
      *
      * Pinned because both are the obvious next thing a reader tries after the
      * class-specific registration works, and both fail silently: the entry
@@ -668,8 +670,9 @@ class XmlEncoderTest extends TestCase
     {
         $encoder = $this->getXmlEncoder();
 
-        // Registered under the builtin object key: that is the lookup this
-        // encoder supports, and it makes every object property run the closure.
+        // Registered under the builtin object key rather than a class name: the
+        // catch-all is what makes every object property run the closure, which is
+        // what this test needs.
         $encoder->addType(
             'object',
             static fn (string $name, object $value): string => (string) $encoder->map(new Author())
@@ -737,5 +740,24 @@ class XmlEncoderTest extends TestCase
         $this->expectException(DOMException::class);
 
         (new XmlEncoder($extractor, $converter))->map(new Author());
+    }
+
+    /**
+     * The interface half of the same rule.
+     *
+     * Registering under an interface is not a special case: it fires exactly
+     * when the property is declared as that interface, because the lookup
+     * compares names rather than walking the hierarchy. Pinned because it is
+     * the one branch of the rule that prose alone was holding, and because the
+     * failure is silent — a miss yields an empty element, not an error.
+     */
+    #[Test]
+    public function appliesAClassKeyRegisteredUnderAnInterfaceToAnInterfaceTypedProperty(): void
+    {
+        $result = (string) $this->getXmlEncoder()
+            ->addType(MoneyLike::class, static fn (string $name, MoneyLike $value): string => 'iface')
+            ->map(new InterfaceMoneyHost());
+
+        self::assertStringContainsString('<amount>iface</amount>', $result);
     }
 }
