@@ -448,6 +448,11 @@ class XmlEncoderTest extends TestCase
         // carry the raw class short name. Author annotates its property, so one
         // type extractor suffices — no unexplained variance in a test whose
         // entire purpose is exactness.
+        //
+        // This pins DOMDocument's own formatting too: the declaration, the
+        // two-space indent and the trailing newline all come from formatOutput.
+        // If that ever changes, expect this to fail as a byte diff rather than
+        // as a semantic one.
         $extractor = new PropertyInfoExtractor(
             [new ReflectionExtractor()],
             [new PhpDocExtractor()]
