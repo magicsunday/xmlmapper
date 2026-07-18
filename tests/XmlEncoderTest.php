@@ -26,6 +26,7 @@ use MagicSunday\Test\Fixture\NativeMarkers;
 use MagicSunday\Test\Fixture\NativeWithForeignAttribute;
 use MagicSunday\Test\Fixture\NativeWithForeignDocblock;
 use MagicSunday\Test\Fixture\Person;
+use MagicSunday\Test\Fixture\PlainBody;
 use MagicSunday\Test\Fixture\Price;
 use MagicSunday\Test\Fixture\UnionObjectHost;
 use MagicSunday\Test\Fixture\UnionProperty;
@@ -528,5 +529,23 @@ class XmlEncoderTest extends TestCase
 
         self::assertSame('raw & <b>text</b>', $root->textContent);
         self::assertSame('EUR & GBP', $root->getAttribute('currency'));
+    }
+
+    /**
+     * A value that encodes to an empty string stays a self-closing element.
+     *
+     * Pinned with an exact comparison: assertXmlStringEqualsXmlString treats
+     * `<a/>` and `<a></a>` as equal, so it cannot see this at all.
+     */
+    #[Test]
+    public function keepsAnEmptyValueSelfClosing(): void
+    {
+        $host       = new PlainBody();
+        $host->body = '';
+
+        self::assertStringContainsString(
+            '<body/>',
+            (string) $this->getXmlEncoder()->map($host)
+        );
     }
 }
