@@ -142,24 +142,38 @@ class XmlEncoder
         // A fresh document per call: keeping one for the lifetime of the encoder
         // made a second call append another root element to the first result,
         // which is a truthy string that no XML parser accepts.
-        $this->domDocument                = new DOMDocument('1.0', 'UTF-8');
-        $this->domDocument->xmlStandalone = false;
-        $this->domDocument->formatOutput  = true;
+        //
+        // The previous document is restored afterwards so a nested call — a
+        // custom-type closure mapping a sub-object through the same encoder —
+        // cannot pull the document out from under the outer run.
+        $previousDocument = $this->domDocument ?? null;
 
-        $rootElementName = $this->getClassShortName($instance);
+        try {
+            $this->domDocument                = new DOMDocument('1.0', 'UTF-8');
+            $this->domDocument->xmlStandalone = false;
+            $this->domDocument->formatOutput  = true;
 
-        if ($this->nameConverter instanceof PropertyNameConverterInterface) {
-            $rootElementName = $this->nameConverter->convert($rootElementName);
+            $rootElementName = $this->getClassShortName($instance);
+
+            if ($this->nameConverter instanceof PropertyNameConverterInterface) {
+                $rootElementName = $this->nameConverter->convert($rootElementName);
+            }
+
+            // Encode given object instance. Set the short name of class as surrounding XML tag
+            $this->encodeObject(
+                null,
+                $rootElementName,
+                $instance
+            );
+
+            return $this->domDocument->saveXML();
+        } finally {
+            if ($previousDocument instanceof DOMDocument) {
+                $this->domDocument = $previousDocument;
+            } else {
+                unset($this->domDocument);
+            }
         }
-
-        // Encode given object instance. Set the short name of class as surrounding XML tag
-        $this->encodeObject(
-            null,
-            $rootElementName,
-            $instance
-        );
-
-        return $this->domDocument->saveXML();
     }
 
     /**

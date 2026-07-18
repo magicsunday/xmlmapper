@@ -459,4 +459,39 @@ class XmlEncoderTest extends TestCase
 
         self::assertTrue($loaded, 'A repeated map() call produced XML that cannot be parsed back');
     }
+
+    /**
+     * A nested map() call must not pull the document out from under the outer
+     * one. A custom-type closure serialising a sub-object through the same
+     * encoder is the realistic way to reach this.
+     */
+    #[Test]
+    public function survivesANestedMapCallOnTheSameInstance(): void
+    {
+        $encoder = $this->getXmlEncoder();
+
+        // Registered under the builtin object key: that is the lookup this
+        // encoder supports, and it makes every object property run the closure.
+        $encoder->addType(
+            'object',
+            static fn (string $name, mixed $value): string => (string) $encoder->map(new Author())
+        );
+
+        $host         = new CustomTypeHost();
+        $host->author = new Author();
+
+        $outer = (string) $encoder->map($host);
+
+        // The outer document survived: it still has its own root and parses.
+        $document = new DOMDocument();
+
+        $previous = libxml_use_internal_errors(true);
+        $loaded   = $document->loadXML($outer);
+
+        libxml_clear_errors();
+        libxml_use_internal_errors($previous);
+
+        self::assertTrue($loaded, 'A nested map() call corrupted the outer document');
+        self::assertSame('customTypeHost', $document->documentElement?->nodeName);
+    }
 }
