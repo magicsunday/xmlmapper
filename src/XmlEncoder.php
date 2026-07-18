@@ -476,13 +476,23 @@ class XmlEncoder
         if ($value instanceof XmlSerializable) {
             $this->encodeObject($parent, $name, $value);
         } else {
-            // Write encoded value directly into XML output
-            $parent->appendChild(
-                $this->domDocument->createElement(
-                    $name,
-                    $this->encodeValue($value)
-                )
-            );
+            // The value goes in as a text node rather than through the second
+            // argument of createElement(): that argument is not escaped, so an
+            // ampersand truncated the rest of the value and an already-encoded
+            // value lost a level of escaping on every round trip.
+            $element = $this->domDocument->createElement($name);
+            $encoded = $this->encodeValue($value);
+
+            // Only append a text node when there is text: an empty one would
+            // turn `<name/>` into `<name></name>` for every value that encodes
+            // to an empty string.
+            if ($encoded !== '') {
+                $element->appendChild(
+                    $this->domDocument->createTextNode($encoded)
+                );
+            }
+
+            $parent->appendChild($element);
         }
     }
 
