@@ -283,14 +283,13 @@ class XmlEncoder
      * type closures are registered under the builtin type name, so object and
      * collection types resolve to "object" and "array" respectively.
      *
-     * @param Type $type
+     * @param Type $baseType The property type with its nullable wrapper already
+     *                       removed by {@see getBaseType()}
      *
      * @return string
      */
-    private function getBuiltinTypeName(Type $type): string
+    private function getBuiltinTypeName(Type $baseType): string
     {
-        $baseType = $this->getBaseType($type);
-
         if ($baseType instanceof BuiltinType) {
             return $baseType->getTypeIdentifier()->value;
         }
@@ -610,7 +609,7 @@ class XmlEncoder
             return $baseType->getClassName();
         }
 
-        $builtinType = $this->getBuiltinTypeName($type);
+        $builtinType = $this->getBuiltinTypeName($baseType);
 
         return $this->isCustomType($builtinType) ? $builtinType : null;
     }
