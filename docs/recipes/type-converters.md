@@ -65,8 +65,10 @@ $encoder
 `Money` properties go through the first closure, every other object property
 through the second. Without the class key, both would collapse onto `object`.
 
-A class key matches the property's **own declared type** only. A collection of
-that class (`@var Money[]`) resolves to the builtin key `array`, so the class
+A class key matches the property's **own declared type** only — it is not
+resolved through the inheritance chain, so a converter registered for a parent
+class does not fire for a property declared as a subclass. A collection of
+that class (`@var Money[]`) likewise resolves to the builtin key `array`, so the class
 closure is not applied per entry — and because `Money` does not implement
 `XmlSerializable`, each entry then renders as an empty element without an error.
 Register the collection under `array` and convert the entries yourself:

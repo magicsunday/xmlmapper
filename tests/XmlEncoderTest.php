@@ -26,6 +26,7 @@ use MagicSunday\Test\Fixture\NativeWithForeignAttribute;
 use MagicSunday\Test\Fixture\NativeWithForeignDocblock;
 use MagicSunday\Test\Fixture\Person;
 use MagicSunday\Test\Fixture\Price;
+use MagicSunday\Test\Fixture\SpecialMoneyHost;
 use MagicSunday\Test\Fixture\UnionObjectHost;
 use MagicSunday\Test\Fixture\UnionProperty;
 use MagicSunday\XmlEncoder;
@@ -511,6 +512,29 @@ class XmlEncoderTest extends TestCase
                     <items/>
                     <items/>
                 </moneyBag>
+                XML,
+            (string) $xml
+        );
+    }
+
+    /**
+     * The class key is not resolved through the inheritance chain either: a
+     * converter registered for the parent class does not fire for a property
+     * declared as a subclass, and the entry then renders as an empty element.
+     */
+    #[Test]
+    public function doesNotApplyAClassKeyToASubclassProperty(): void
+    {
+        $xml = $this->getXmlEncoder()
+            ->addType(Money::class, static fn (string $name, mixed $value): string => 'converted')
+            ->map(new SpecialMoneyHost());
+
+        self::assertXmlStringEqualsXmlString(
+            <<<'XML'
+                <?xml version="1.0" encoding="UTF-8"?>
+                <specialMoneyHost>
+                    <amount/>
+                </specialMoneyHost>
                 XML,
             (string) $xml
         );
