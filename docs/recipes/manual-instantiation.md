@@ -34,6 +34,12 @@ $encoder = new XmlEncoder($extractor, new CamelCasePropertyNameConverter());
   falls back to `string`, and is then rendered as a single empty element — its
   entries are dropped without any error.
 
+  The same change also moves the **custom-type lookup key**. A natively typed
+  property that used to resolve to no type fell back to `string` and matched a
+  `string` catch-all closure; once a native-type extractor is listed it resolves
+  to `array`, `int` or an object type and no longer does. Re-check any `string`
+  or `object` catch-all registered through `addType()` after adding one.
+
 ## Without a name converter
 
 Passing only the extractor uses the raw class and property names verbatim:
