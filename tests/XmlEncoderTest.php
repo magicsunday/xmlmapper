@@ -11,6 +11,8 @@ declare(strict_types=1);
 
 namespace MagicSunday\Test;
 
+use DOMDocument;
+use DOMElement;
 use MagicSunday\Test\Fixture\Author;
 use MagicSunday\Test\Fixture\BodyHost;
 use MagicSunday\Test\Fixture\Book;
@@ -429,6 +431,82 @@ class XmlEncoderTest extends TestCase
                 XML,
             (string) $this->getXmlEncoder()->map($host)
         );
+    }
+
+    /**
+     * The encoder takes its collaborators through the constructor and is
+     * therefore a natural candidate for a container service, so a second call
+     * has to produce the same document instead of appending a second root
+     * element to the first one.
+     */
+    #[Test]
+    public function mapIsRepeatableOnTheSameInstance(): void
+    {
+        $encoder = $this->getXmlEncoder();
+
+        $first  = (string) $encoder->map(new Author());
+        $second = (string) $encoder->map(new Author());
+
+        self::assertSame($first, $second);
+
+        // Two root elements would still be a truthy, non-empty string, so
+        // parsing the result back is what actually discriminates here.
+        $document = new DOMDocument();
+
+        $previous = libxml_use_internal_errors(true);
+        $loaded   = $document->loadXML($second);
+
+        libxml_clear_errors();
+        libxml_use_internal_errors($previous);
+
+        self::assertTrue($loaded, 'A repeated map() call produced XML that cannot be parsed back');
+    }
+
+    /**
+     * A nested map() call must not pull the document out from under the outer
+     * one. A custom-type closure serialising a sub-object through the same
+     * encoder is the realistic way to reach this.
+     */
+    #[Test]
+    public function survivesANestedMapCallOnTheSameInstance(): void
+    {
+        $encoder = $this->getXmlEncoder();
+
+        // Registered under the builtin object key: that is the lookup this
+        // encoder supports, and it makes every object property run the closure.
+        $encoder->addType(
+            'object',
+            static fn (string $name, object $value): string => (string) $encoder->map(new Author())
+        );
+
+        $host         = new CustomTypeHost();
+        $host->author = new Author();
+
+        $outer = (string) $encoder->map($host);
+
+        // The outer document survived: it still has its own root and parses.
+        $document = new DOMDocument();
+
+        $previous = libxml_use_internal_errors(true);
+        $loaded   = $document->loadXML($outer);
+
+        libxml_clear_errors();
+        libxml_use_internal_errors($previous);
+
+        self::assertTrue($loaded, 'A nested map() call corrupted the outer document');
+        self::assertSame('customTypeHost', $document->documentElement?->nodeName);
+
+        // The inner run has to have produced something as well: asserting only
+        // that the outer document survived cannot tell "both ran" apart from
+        // "the outer survived and the inner returned nothing".
+        //
+        // The element is pinned before its text is read. A `?? ''` fallback here
+        // would collapse "no author element at all" and "an empty one" into the
+        // same failure message, which is the distinction under test.
+        $author = $document->getElementsByTagName('author')->item(0);
+
+        self::assertInstanceOf(DOMElement::class, $author);
+        self::assertStringContainsString('<name>Jane Doe</name>', $author->textContent);
     }
 
     /**
