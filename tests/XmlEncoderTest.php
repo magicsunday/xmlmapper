@@ -20,6 +20,9 @@ use MagicSunday\Test\Fixture\Book;
 use MagicSunday\Test\Fixture\Chapter;
 use MagicSunday\Test\Fixture\Comment;
 use MagicSunday\Test\Fixture\CustomTypeHost;
+use MagicSunday\Test\Fixture\EscapeCDataHost;
+use MagicSunday\Test\Fixture\EscapeHost;
+use MagicSunday\Test\Fixture\EscapeMarkerHost;
 use MagicSunday\Test\Fixture\InterfaceMoneyHost;
 use MagicSunday\Test\Fixture\Money;
 use MagicSunday\Test\Fixture\MoneyBag;
@@ -30,6 +33,7 @@ use MagicSunday\Test\Fixture\NativeMarkers;
 use MagicSunday\Test\Fixture\NativeWithForeignAttribute;
 use MagicSunday\Test\Fixture\NativeWithForeignDocblock;
 use MagicSunday\Test\Fixture\Person;
+use MagicSunday\Test\Fixture\PlainBody;
 use MagicSunday\Test\Fixture\Price;
 use MagicSunday\Test\Fixture\SerializableMoney;
 use MagicSunday\Test\Fixture\SerializableMoneyBag;
@@ -759,5 +763,142 @@ class XmlEncoderTest extends TestCase
             ->map(new InterfaceMoneyHost());
 
         self::assertStringContainsString('<amount>iface</amount>', $result);
+    }
+
+    /**
+     * A value that encodes to an empty string stays a self-closing element.
+     *
+     * Pinned with an exact comparison: assertXmlStringEqualsXmlString treats
+     * `<a/>` and `<a></a>` as equal, so it cannot see this at all.
+     */
+    #[Test]
+    public function keepsAnEmptyValueSelfClosing(): void
+    {
+        $host       = new PlainBody();
+        $host->body = '';
+
+        self::assertStringContainsString(
+            '<body/>',
+            (string) $this->getXmlEncoder()->map($host)
+        );
+    }
+
+    /**
+     * Parses the encoder output back and returns the document element.
+     *
+     * Escaping cannot be asserted with assertXmlStringEqualsXmlString: that
+     * assertion normalises entity spelling away, which is exactly the dimension
+     * under test here.
+     *
+     * @param string $xml       Encoder output
+     * @param string $onFailure Diagnostic shown when the output does not parse
+     *
+     * @return DOMElement
+     */
+    private function parseDocumentElement(
+        string $xml,
+        string $onFailure = 'Encoder produced XML that cannot be parsed back',
+    ): DOMElement {
+        $document = new DOMDocument();
+
+        // Capture libxml errors internally: on the failure path loadXML() emits
+        // a PHP warning, which the test runner turns into an exception before
+        // the assertion below can report what actually went wrong.
+        $previous = libxml_use_internal_errors(true);
+        $loaded   = $document->loadXML($xml);
+
+        libxml_clear_errors();
+        libxml_use_internal_errors($previous);
+
+        self::assertTrue($loaded, $onFailure);
+
+        $documentElement = $document->documentElement;
+
+        self::assertInstanceOf(DOMElement::class, $documentElement);
+
+        return $documentElement;
+    }
+
+    /**
+     * An already-encoded value must not lose a level of escaping on the way
+     * out, otherwise a round trip silently rewrites the data.
+     */
+    #[Test]
+    public function preservesAnAlreadyEncodedValue(): void
+    {
+        $root = $this->parseDocumentElement(
+            (string) $this->getXmlEncoder()->map(new EscapeHost())
+        );
+
+        self::assertSame(
+            'x &amp; y',
+            $root->getElementsByTagName('preencoded')->item(0)?->textContent
+        );
+    }
+
+    /**
+     * The attribute path already escaped correctly; pinning it keeps the two
+     * paths from drifting apart again.
+     */
+    #[Test]
+    public function preservesSignificantCharactersOnTheAttributePath(): void
+    {
+        $root = $this->parseDocumentElement(
+            (string) $this->getXmlEncoder()->map(new EscapeHost())
+        );
+
+        self::assertSame('a & b < c', $root->getAttribute('attribute'));
+    }
+
+    /**
+     * A value carrying XML-significant characters has to arrive unchanged. The
+     * element path is the one that lost content: an unescaped ampersand
+     * truncated everything after it.
+     */
+    #[Test]
+    public function preservesSignificantCharactersOnTheElementPath(): void
+    {
+        $root = $this->parseDocumentElement(
+            (string) $this->getXmlEncoder()->map(new EscapeHost())
+        );
+
+        self::assertSame(
+            'Tom & <b>Jerry</b>',
+            $root->getElementsByTagName('element')->item(0)?->textContent
+        );
+    }
+
+    /**
+     * The text-node path likewise already escaped correctly.
+     */
+    #[Test]
+    public function preservesSignificantCharactersOnTheTextNodePath(): void
+    {
+        $root = $this->parseDocumentElement(
+            (string) $this->getXmlEncoder()->map(new EscapeMarkerHost())
+        );
+
+        self::assertSame('raw & <b>text</b>', $root->textContent);
+        self::assertSame('EUR & GBP', $root->getAttribute('currency'));
+    }
+
+    /**
+     * The third write path.
+     *
+     * A CDATA section is not terminated by an entity but by the literal
+     * sequence `]]>`, so escaping here is structural. The value is parsed back
+     * rather than string-matched: libxml splits the sequence across two
+     * sections, which a substring assertion would either miss or mis-report.
+     */
+    #[Test]
+    public function preservesTheTerminatorSequenceInACDataSection(): void
+    {
+        $root = $this->parseDocumentElement(
+            (string) $this->getXmlEncoder()->map(new EscapeCDataHost())
+        );
+
+        // A CDATA-marked property becomes the content of the class element
+        // itself, so the value is read off the document element.
+        self::assertSame('a]]>b', $root->textContent);
     }
 }
