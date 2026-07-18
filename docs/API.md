@@ -25,7 +25,7 @@ names.
 
 The root element is named after the object's short class name (passed through the
 name converter when one is configured). Properties with a `null` value are
-skipped.
+skipped, as are typed properties that were never assigned.
 
 ### `addType(string $type, Closure $closure): $this`
 

@@ -23,6 +23,7 @@ use MagicSunday\Test\Fixture\NativeWithForeignAttribute;
 use MagicSunday\Test\Fixture\NativeWithForeignDocblock;
 use MagicSunday\Test\Fixture\Person;
 use MagicSunday\Test\Fixture\Price;
+use MagicSunday\Test\Fixture\UninitializedHost;
 use MagicSunday\Test\Fixture\UnionObjectHost;
 use MagicSunday\Test\Fixture\UnionProperty;
 use MagicSunday\XmlEncoder;
@@ -427,6 +428,28 @@ class XmlEncoderTest extends TestCase
                 </unionObjectHost>
                 XML,
             (string) $this->getXmlEncoder()->map($host)
+        );
+    }
+
+    /**
+     * A typed property that was never assigned is skipped like a null value.
+     *
+     * Reading it raises a native Error, which is outside every documented
+     * guarantee of map() — neither the false return nor DOMException covers it.
+     * Uninitialized typed properties are an ordinary DTO shape, so the encoder
+     * has to tolerate them rather than terminate the whole mapping.
+     */
+    #[Test]
+    public function skipsUninitializedTypedProperties(): void
+    {
+        self::assertXmlStringEqualsXmlString(
+            <<<'XML'
+                <?xml version="1.0" encoding="UTF-8"?>
+                <uninitializedHost>
+                    <filled>value</filled>
+                </uninitializedHost>
+                XML,
+            (string) $this->getXmlEncoder()->map(new UninitializedHost())
         );
     }
 }

@@ -180,7 +180,16 @@ class XmlEncoder
                 continue;
             }
 
-            $property      = $reflection->getProperty($propertyName);
+            $property = $reflection->getProperty($propertyName);
+
+            // A typed property that was never assigned raises a native Error on
+            // read. That is outside every guarantee map() documents, and an
+            // unset optional property is an ordinary DTO shape, so treat it the
+            // same way as a null value: skip it.
+            if (!$property->isInitialized($instance)) {
+                continue;
+            }
+
             $propertyValue = $property->getValue($instance);
             $propertyType  = $this->getType($className, $propertyName);
             $builtinType   = $this->getBuiltinTypeName($propertyType);
