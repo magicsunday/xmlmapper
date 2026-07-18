@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace MagicSunday\Test;
 
+use DOMDocument;
 use MagicSunday\Test\Fixture\Author;
 use MagicSunday\Test\Fixture\BodyHost;
 use MagicSunday\Test\Fixture\Book;
@@ -428,5 +429,34 @@ class XmlEncoderTest extends TestCase
                 XML,
             (string) $this->getXmlEncoder()->map($host)
         );
+    }
+
+    /**
+     * The encoder takes its collaborators through the constructor and is
+     * therefore a natural candidate for a container service, so a second call
+     * has to produce the same document instead of appending a second root
+     * element to the first one.
+     */
+    #[Test]
+    public function mapIsRepeatableOnTheSameInstance(): void
+    {
+        $encoder = $this->getXmlEncoder();
+
+        $first  = (string) $encoder->map(new Author());
+        $second = (string) $encoder->map(new Author());
+
+        self::assertSame($first, $second);
+
+        // Two root elements would still be a truthy, non-empty string, so
+        // parsing the result back is what actually discriminates here.
+        $document = new DOMDocument();
+
+        $previous = libxml_use_internal_errors(true);
+        $loaded   = $document->loadXML($second);
+
+        libxml_clear_errors();
+        libxml_use_internal_errors($previous);
+
+        self::assertTrue($loaded, 'A repeated map() call produced XML that cannot be parsed back');
     }
 }

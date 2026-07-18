@@ -59,7 +59,7 @@ class XmlEncoder
     ];
 
     /**
-     * XMLWriter instance.
+     * The document being built by the current map() call.
      *
      * @var DOMDocument
      */
@@ -108,10 +108,6 @@ class XmlEncoder
         PropertyInfoExtractorInterface $extractor,
         ?PropertyNameConverterInterface $nameConverter = null,
     ) {
-        $this->domDocument                = new DOMDocument('1.0', 'UTF-8');
-        $this->domDocument->xmlStandalone = false;
-        $this->domDocument->formatOutput  = true;
-
         $this->defaultType   = new BuiltinType(TypeIdentifier::STRING);
         $this->extractor     = $extractor;
         $this->nameConverter = $nameConverter;
@@ -143,6 +139,13 @@ class XmlEncoder
      */
     public function map(XmlSerializable $instance): string|false
     {
+        // A fresh document per call: keeping one for the lifetime of the encoder
+        // made a second call append another root element to the first result,
+        // which is a truthy string that no XML parser accepts.
+        $this->domDocument                = new DOMDocument('1.0', 'UTF-8');
+        $this->domDocument->xmlStandalone = false;
+        $this->domDocument->formatOutput  = true;
+
         $rootElementName = $this->getClassShortName($instance);
 
         if ($this->nameConverter instanceof PropertyNameConverterInterface) {
