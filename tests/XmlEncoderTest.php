@@ -493,5 +493,13 @@ class XmlEncoderTest extends TestCase
 
         self::assertTrue($loaded, 'A nested map() call corrupted the outer document');
         self::assertSame('customTypeHost', $document->documentElement?->nodeName);
+
+        // The inner run has to have produced something as well: asserting only
+        // that the outer document survived cannot tell "both ran" apart from
+        // "the outer survived and the inner returned nothing".
+        self::assertStringContainsString(
+            '<name>Jane Doe</name>',
+            $document->getElementsByTagName('author')->item(0)?->textContent ?? ''
+        );
     }
 }
