@@ -11,6 +11,9 @@ declare(strict_types=1);
 
 namespace MagicSunday\Test;
 
+use DOMDocument;
+use DOMElement;
+use DOMException;
 use MagicSunday\Test\Fixture\Author;
 use MagicSunday\Test\Fixture\BodyHost;
 use MagicSunday\Test\Fixture\Book;
@@ -30,6 +33,7 @@ use MagicSunday\Test\Fixture\SerializableMoney;
 use MagicSunday\Test\Fixture\SerializableMoneyBag;
 use MagicSunday\Test\Fixture\SpecialMoney;
 use MagicSunday\Test\Fixture\SpecialMoneyHost;
+use MagicSunday\Test\Fixture\UninitializedHost;
 use MagicSunday\Test\Fixture\UnionObjectHost;
 use MagicSunday\Test\Fixture\UnionProperty;
 use MagicSunday\XmlEncoder;
@@ -37,17 +41,13 @@ use MagicSunday\XmlMapper\Annotation\XmlAttribute;
 use MagicSunday\XmlMapper\Annotation\XmlCDataSection;
 use MagicSunday\XmlMapper\Annotation\XmlNodeValue;
 use MagicSunday\XmlMapper\Converter\CamelCasePropertyNameConverter;
+use MagicSunday\XmlMapper\Converter\PropertyNameConverterInterface;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\Attributes\UsesClass;
 use Symfony\Component\PropertyInfo\Extractor\PhpDocExtractor;
 use Symfony\Component\PropertyInfo\Extractor\ReflectionExtractor;
 use Symfony\Component\PropertyInfo\PropertyInfoExtractor;
-use DOMDocument;
-use DOMElement;
-use DOMException;
-use MagicSunday\Test\Fixture\UninitializedHost;
-use MagicSunday\XmlMapper\Converter\PropertyNameConverterInterface;
 
 /**
  * Behavioural characterization tests pinning the XML output produced by the encoder.
