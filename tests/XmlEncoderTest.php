@@ -449,7 +449,16 @@ class XmlEncoderTest extends TestCase
     {
         $document = new DOMDocument();
 
-        self::assertTrue($document->loadXML($xml), 'Encoder produced XML that cannot be parsed back');
+        // Capture libxml errors internally: on the failure path loadXML() emits
+        // a PHP warning, which the test runner turns into an exception before
+        // the assertion below can report what actually went wrong.
+        $previous = libxml_use_internal_errors(true);
+        $loaded   = $document->loadXML($xml);
+
+        libxml_clear_errors();
+        libxml_use_internal_errors($previous);
+
+        self::assertTrue($loaded, 'Encoder produced XML that cannot be parsed back');
 
         $documentElement = $document->documentElement;
 
