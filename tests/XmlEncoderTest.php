@@ -535,15 +535,7 @@ class XmlEncoderTest extends TestCase
 
         // Two root elements would still be a truthy, non-empty string, so
         // parsing the result back is what actually discriminates here.
-        $document = new DOMDocument();
-
-        $previous = libxml_use_internal_errors(true);
-        $loaded   = $document->loadXML($second);
-
-        libxml_clear_errors();
-        libxml_use_internal_errors($previous);
-
-        self::assertTrue($loaded, 'A repeated map() call produced XML that cannot be parsed back');
+        $this->parseDocumentElement($second, 'A repeated map() call produced XML that cannot be parsed back');
     }
 
     /**
@@ -613,8 +605,9 @@ class XmlEncoderTest extends TestCase
     {
         $encoder = $this->getXmlEncoder();
 
-        // Registered under the builtin object key: that is the lookup this
-        // encoder supports, and it makes every object property run the closure.
+        // Registered under the builtin object key rather than a class name: the
+        // catch-all is what makes every object property run the closure, which is
+        // what this test needs.
         $encoder->addType(
             'object',
             static fn (string $name, object $value): string => (string) $encoder->map(new Author())
@@ -626,16 +619,9 @@ class XmlEncoderTest extends TestCase
         $outer = (string) $encoder->map($host);
 
         // The outer document survived: it still has its own root and parses.
-        $document = new DOMDocument();
+        $root = $this->parseDocumentElement($outer, 'A nested map() call corrupted the outer document');
 
-        $previous = libxml_use_internal_errors(true);
-        $loaded   = $document->loadXML($outer);
-
-        libxml_clear_errors();
-        libxml_use_internal_errors($previous);
-
-        self::assertTrue($loaded, 'A nested map() call corrupted the outer document');
-        self::assertSame('customTypeHost', $document->documentElement?->nodeName);
+        self::assertSame('customTypeHost', $root->nodeName);
 
         // The inner run has to have produced something as well: asserting only
         // that the outer document survived cannot tell "both ran" apart from
@@ -644,7 +630,7 @@ class XmlEncoderTest extends TestCase
         // The element is pinned before its text is read. A `?? ''` fallback here
         // would collapse "no author element at all" and "an empty one" into the
         // same failure message, which is the distinction under test.
-        $author = $document->getElementsByTagName('author')->item(0);
+        $author = $root->ownerDocument?->getElementsByTagName('author')->item(0);
 
         self::assertInstanceOf(DOMElement::class, $author);
         self::assertStringContainsString('<name>Jane Doe</name>', $author->textContent);
@@ -997,5 +983,37 @@ class XmlEncoderTest extends TestCase
 
         // ... and the value it was meant to replace is in the output instead.
         self::assertStringContainsString('1250', $result);
+    }
+
+    /**
+     * The repeated call produces the expected document, not merely the same one
+     * twice.
+     *
+     * mapIsRepeatableOnTheSameInstance() compares the two runs against each
+     * other and parses the result back, so an encoder that produced identical
+     * but wrong output on both calls would satisfy it. Other tests do pin the
+     * content, but only for a single call — this is the one place where the
+     * repeated path and the expected content are asserted together.
+     *
+     * Adapted from a fix proposed by @Dodothereal in PR #45, which arrived
+     * before the repeatability fix landed and carried this assertion.
+     */
+    #[Test]
+    public function repeatedCallsProduceTheExpectedDocumentNotJustTheSameOne(): void
+    {
+        $encoder  = $this->getXmlEncoder();
+        $person   = new Person();
+        $expected = <<<'XML'
+            <?xml version="1.0" encoding="UTF-8"?>
+            <person>
+                <firstName>John</firstName>
+                <homeTown>Berlin</homeTown>
+                <age>42</age>
+                <active>1</active>
+            </person>
+            XML;
+
+        self::assertXmlStringEqualsXmlString($expected, (string) $encoder->map($person));
+        self::assertXmlStringEqualsXmlString($expected, (string) $encoder->map($person));
     }
 }
