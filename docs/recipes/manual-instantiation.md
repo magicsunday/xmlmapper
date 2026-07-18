@@ -25,7 +25,14 @@ $encoder = new XmlEncoder($extractor, new CamelCasePropertyNameConverter());
 ```
 
 - The **list extractors** decide which properties are encoded. `ReflectionExtractor`
-  exposes public properties.
+  reports everything reachable through a public accessor, which is wider than
+  "public properties": a `private` field with a public getter is reported and
+  therefore encoded. If that is not wanted, narrow the list extractor rather
+  than relying on visibility.
+- Values are read **as fields**, not through the accessor. A getter that
+  formats, rounds or redacts its value therefore has no effect on the output,
+  and a purely virtual property — an accessor with no backing field — is
+  skipped entirely.
 - The **type extractors** resolve each property's type, which drives collection
   detection and the custom-type lookup key. `PhpDocExtractor` reads `@var`
   annotations such as `@var Chapter[]`; the `ReflectionExtractor` also contributes

@@ -25,6 +25,7 @@ use MagicSunday\Test\Fixture\Person;
 use MagicSunday\Test\Fixture\Price;
 use MagicSunday\Test\Fixture\UnionObjectHost;
 use MagicSunday\Test\Fixture\UnionProperty;
+use MagicSunday\Test\Fixture\VisibilityHost;
 use MagicSunday\XmlEncoder;
 use MagicSunday\XmlMapper\Annotation\XmlAttribute;
 use MagicSunday\XmlMapper\Annotation\XmlCDataSection;
@@ -428,5 +429,33 @@ class XmlEncoderTest extends TestCase
                 XML,
             (string) $this->getXmlEncoder()->map($host)
         );
+    }
+
+    /**
+     * The encoding boundary is drawn by the list extractor, not by the
+     * visibility of the backing field, and values are then read as fields.
+     *
+     * Both halves matter and they disagree in one direction: a private field
+     * with a public accessor IS reported by ReflectionExtractor and therefore
+     * encoded, while a purely virtual accessor has no field to read and is
+     * dropped. Accessor transformations are consequently not applied.
+     */
+    #[Test]
+    public function encodesWhatTheExtractorReportsAndReadsItAsAField(): void
+    {
+        $xml = (string) $this->getXmlEncoder()->map(new VisibilityHost());
+
+        self::assertXmlStringEqualsXmlString(
+            <<<'XML'
+                <?xml version="1.0" encoding="UTF-8"?>
+                <visibilityHost>
+                    <visible>public</visible>
+                    <hidden>private-with-getter</hidden>
+                </visibilityHost>
+                XML,
+            $xml
+        );
+
+        self::assertStringNotContainsString('computed', $xml);
     }
 }
