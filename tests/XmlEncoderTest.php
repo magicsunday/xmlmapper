@@ -446,12 +446,15 @@ class XmlEncoderTest extends TestCase
      * assertion normalises entity spelling away, which is exactly the dimension
      * under test here.
      *
-     * @param string $xml Encoder output
+     * @param string $xml       Encoder output
+     * @param string $onFailure Diagnostic shown when the output does not parse
      *
      * @return DOMElement
      */
-    private function parseDocumentElement(string $xml): DOMElement
-    {
+    private function parseDocumentElement(
+        string $xml,
+        string $onFailure = 'Encoder produced XML that cannot be parsed back',
+    ): DOMElement {
         $document = new DOMDocument();
 
         // Capture libxml errors internally: on the failure path loadXML() emits
@@ -463,7 +466,7 @@ class XmlEncoderTest extends TestCase
         libxml_clear_errors();
         libxml_use_internal_errors($previous);
 
-        self::assertTrue($loaded, 'Encoder produced XML that cannot be parsed back');
+        self::assertTrue($loaded, $onFailure);
 
         $documentElement = $document->documentElement;
 
@@ -591,15 +594,7 @@ class XmlEncoderTest extends TestCase
 
         // Two root elements would still be a truthy, non-empty string, so
         // parsing the result back is what actually discriminates here.
-        $document = new DOMDocument();
-
-        $previous = libxml_use_internal_errors(true);
-        $loaded   = $document->loadXML($second);
-
-        libxml_clear_errors();
-        libxml_use_internal_errors($previous);
-
-        self::assertTrue($loaded, 'A repeated map() call produced XML that cannot be parsed back');
+        $this->parseDocumentElement($second, 'A repeated map() call produced XML that cannot be parsed back');
     }
 
     /**
@@ -682,16 +677,9 @@ class XmlEncoderTest extends TestCase
         $outer = (string) $encoder->map($host);
 
         // The outer document survived: it still has its own root and parses.
-        $document = new DOMDocument();
+        $root = $this->parseDocumentElement($outer, 'A nested map() call corrupted the outer document');
 
-        $previous = libxml_use_internal_errors(true);
-        $loaded   = $document->loadXML($outer);
-
-        libxml_clear_errors();
-        libxml_use_internal_errors($previous);
-
-        self::assertTrue($loaded, 'A nested map() call corrupted the outer document');
-        self::assertSame('customTypeHost', $document->documentElement?->nodeName);
+        self::assertSame('customTypeHost', $root->nodeName);
 
         // The inner run has to have produced something as well: asserting only
         // that the outer document survived cannot tell "both ran" apart from
@@ -700,7 +688,7 @@ class XmlEncoderTest extends TestCase
         // The element is pinned before its text is read. A `?? ''` fallback here
         // would collapse "no author element at all" and "an empty one" into the
         // same failure message, which is the distinction under test.
-        $author = $document->getElementsByTagName('author')->item(0);
+        $author = $root->ownerDocument?->getElementsByTagName('author')->item(0);
 
         self::assertInstanceOf(DOMElement::class, $author);
         self::assertStringContainsString('<name>Jane Doe</name>', $author->textContent);
