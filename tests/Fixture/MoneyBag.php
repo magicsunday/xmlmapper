@@ -14,32 +14,25 @@ namespace MagicSunday\Test\Fixture;
 use MagicSunday\XmlSerializable;
 
 /**
- * Holds two differently typed object properties so a custom type registered for
- * one class can be shown not to affect the other.
+ * Holds a collection of a class that a custom type could be registered for, so
+ * the boundary of the class-key lookup stays pinned.
  *
  * @author  Rico Sonntag <mail@ricosonntag.de>
  * @license https://opensource.org/licenses/MIT
  * @link    https://github.com/magicsunday/xmlmapper/
  */
-class MoneyHost implements XmlSerializable
+class MoneyBag implements XmlSerializable
 {
     /**
-     * @var Money
+     * @var Money[]
      */
-    public Money $amount;
+    public array $items;
 
     /**
-     * @var Author
-     */
-    public Author $author;
-
-    /**
-     * Seeds both properties so a class-specific converter can be shown not to
-     * affect the other one.
+     * Seeds two entries so the collection path is exercised.
      */
     public function __construct()
     {
-        $this->amount = new Money();
-        $this->author = new Author();
+        $this->items = [new Money(), new Money()];
     }
 }

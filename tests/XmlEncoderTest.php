@@ -18,6 +18,7 @@ use MagicSunday\Test\Fixture\Chapter;
 use MagicSunday\Test\Fixture\Comment;
 use MagicSunday\Test\Fixture\CustomTypeHost;
 use MagicSunday\Test\Fixture\Money;
+use MagicSunday\Test\Fixture\MoneyBag;
 use MagicSunday\Test\Fixture\MoneyHost;
 use MagicSunday\Test\Fixture\NativeCData;
 use MagicSunday\Test\Fixture\NativeMarkers;
@@ -481,6 +482,35 @@ class XmlEncoderTest extends TestCase
                     <amount>money</amount>
                     <author>any-object</author>
                 </moneyHost>
+                XML,
+            (string) $xml
+        );
+    }
+
+    /**
+     * The class key is matched exactly against the property's declared type —
+     * no parent or interface resolution, and no unwrapping of a collection.
+     *
+     * Pinned because both are the obvious next thing a reader tries after the
+     * class-specific registration works, and both fail silently: the entry
+     * falls through to the scalar path, which yields an empty element.
+     */
+    #[Test]
+    public function doesNotApplyAClassKeyToACollectionOfThatClass(): void
+    {
+        $host = new MoneyBag();
+
+        $xml = $this->getXmlEncoder()
+            ->addType(Money::class, static fn (string $name, mixed $value): string => 'converted')
+            ->map($host);
+
+        self::assertXmlStringEqualsXmlString(
+            <<<'XML'
+                <?xml version="1.0" encoding="UTF-8"?>
+                <moneyBag>
+                    <items/>
+                    <items/>
+                </moneyBag>
                 XML,
             (string) $xml
         );

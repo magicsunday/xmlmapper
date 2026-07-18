@@ -65,6 +65,20 @@ $encoder
 `Money` properties go through the first closure, every other object property
 through the second. Without the class key, both would collapse onto `object`.
 
+A class key matches the property's **own declared type** only. A collection of
+that class (`@var Money[]`) resolves to the builtin key `array`, so the class
+closure is not applied per entry — and because `Money` does not implement
+`XmlSerializable`, each entry then renders as an empty element without an error.
+Register the collection under `array` and convert the entries yourself:
+
+```php
+$encoder->addType(
+    'array',
+    static fn (string $name, mixed $value): array
+        => array_map(static fn (Money $money): string => $money->format(), $value)
+);
+```
+
 ## Union-typed properties
 
 A union or intersection type has no single builtin name, so it is dispatched under
