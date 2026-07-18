@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace MagicSunday\Test;
 
+use DOMException;
 use MagicSunday\Test\Fixture\Author;
 use MagicSunday\Test\Fixture\BodyHost;
 use MagicSunday\Test\Fixture\Book;
@@ -30,6 +31,7 @@ use MagicSunday\XmlMapper\Annotation\XmlAttribute;
 use MagicSunday\XmlMapper\Annotation\XmlCDataSection;
 use MagicSunday\XmlMapper\Annotation\XmlNodeValue;
 use MagicSunday\XmlMapper\Converter\CamelCasePropertyNameConverter;
+use MagicSunday\XmlMapper\Converter\PropertyNameConverterInterface;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\Attributes\UsesClass;
@@ -428,5 +430,57 @@ class XmlEncoderTest extends TestCase
                 XML,
             (string) $this->getXmlEncoder()->map($host)
         );
+    }
+
+    /**
+     * One exact-output assertion over a minimal fixture.
+     *
+     * The rest of the suite compares through assertXmlStringEqualsXmlString,
+     * which normalises the declaration, whitespace and entity spelling away —
+     * so nothing pinned the bytes that are actually delivered. Note the
+     * `standalone="no"`: the expected strings elsewhere in this file omit it,
+     * and only the normalising assertion hid that mismatch.
+     */
+    #[Test]
+    public function producesTheExactDocumentBytes(): void
+    {
+        $extractor = new PropertyInfoExtractor(
+            [new ReflectionExtractor()],
+            [new PhpDocExtractor(), new ReflectionExtractor()]
+        );
+
+        self::assertSame(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n"
+            . "<Author>\n"
+            . "  <name>Jane Doe</name>\n"
+            . "</Author>\n",
+            (new XmlEncoder($extractor))->map(new Author())
+        );
+    }
+
+    /**
+     * A name converter is a documented extension point, so a converter that
+     * yields an XML-invalid element name is a reachable path rather than an
+     * exotic one. The exception class is asserted but not its message, which
+     * comes from ext-dom and varies across PHP versions.
+     */
+    #[Test]
+    public function throwsWhenTheConvertedNameIsNotAValidElementName(): void
+    {
+        $extractor = new PropertyInfoExtractor(
+            [new ReflectionExtractor()],
+            [new PhpDocExtractor(), new ReflectionExtractor()]
+        );
+
+        $converter = new class implements PropertyNameConverterInterface {
+            public function convert(string $name): string
+            {
+                return '1' . $name;
+            }
+        };
+
+        $this->expectException(DOMException::class);
+
+        (new XmlEncoder($extractor, $converter))->map(new Author());
     }
 }
