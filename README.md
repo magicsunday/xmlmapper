@@ -141,7 +141,7 @@ Each marker is applied as a native PHP attribute (shown above).
 
 ### Custom types
 
-Register a closure to transform every value of a given builtin type (`bool`, `int`, `array`, `object`, …) before it is written:
+Register a closure to transform every value of a given class or builtin type (`Money::class`, `bool`, `int`, `array`, `object`, …) before it is written:
 
 ```php
 $encoder->addType('bool', static fn (string $name, mixed $value): string => $value === true ? 'yes' : 'no');
