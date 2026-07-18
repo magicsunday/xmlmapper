@@ -20,17 +20,31 @@ use MagicSunday\Test\Fixture\Book;
 use MagicSunday\Test\Fixture\Chapter;
 use MagicSunday\Test\Fixture\Comment;
 use MagicSunday\Test\Fixture\CustomTypeHost;
+use MagicSunday\Test\Fixture\EscapeCDataHost;
+use MagicSunday\Test\Fixture\EscapeHost;
+use MagicSunday\Test\Fixture\EscapeMarkerHost;
+use MagicSunday\Test\Fixture\InterfaceMoneyHost;
+use MagicSunday\Test\Fixture\Money;
+use MagicSunday\Test\Fixture\MoneyBag;
+use MagicSunday\Test\Fixture\MoneyHost;
+use MagicSunday\Test\Fixture\MoneyLike;
 use MagicSunday\Test\Fixture\NativeCData;
 use MagicSunday\Test\Fixture\NativeMarkers;
 use MagicSunday\Test\Fixture\NativeWithForeignAttribute;
 use MagicSunday\Test\Fixture\NativeWithForeignDocblock;
 use MagicSunday\Test\Fixture\Person;
 use MagicSunday\Test\Fixture\PlainArrayHost;
+use MagicSunday\Test\Fixture\PlainBody;
 use MagicSunday\Test\Fixture\Price;
+use MagicSunday\Test\Fixture\SerializableMoney;
+use MagicSunday\Test\Fixture\SerializableMoneyBag;
+use MagicSunday\Test\Fixture\SpecialMoney;
+use MagicSunday\Test\Fixture\SpecialMoneyHost;
 use MagicSunday\Test\Fixture\UninitializedHost;
 use MagicSunday\Test\Fixture\UnionObjectHost;
 use MagicSunday\Test\Fixture\UnionProperty;
 use MagicSunday\Test\Fixture\UnmarkedNested;
+use MagicSunday\Test\Fixture\VisibilityHost;
 use MagicSunday\XmlEncoder;
 use MagicSunday\XmlMapper\Annotation\XmlAttribute;
 use MagicSunday\XmlMapper\Annotation\XmlCDataSection;
@@ -668,5 +682,320 @@ class XmlEncoderTest extends TestCase
         $this->expectException(DOMException::class);
 
         (new XmlEncoder($extractor, $converter))->map(new Author());
+    }
+
+    /**
+     * The interface half of the same rule.
+     *
+     * Registering under an interface is not a special case: it fires exactly
+     * when the property is declared as that interface, because the lookup
+     * compares names rather than walking the hierarchy. Pinned because it is
+     * the one branch of the rule that prose alone was holding, and because the
+     * failure is silent — a miss yields an empty element, not an error.
+     */
+    #[Test]
+    public function appliesAClassKeyRegisteredUnderAnInterfaceToAnInterfaceTypedProperty(): void
+    {
+        $result = (string) $this->getXmlEncoder()
+            ->addType(MoneyLike::class, static fn (string $name, MoneyLike $value): string => 'iface')
+            ->map(new InterfaceMoneyHost());
+
+        self::assertStringContainsString('<amount>iface</amount>', $result);
+    }
+
+    /**
+     * A custom type registered under a class name applies to properties of that
+     * class only.
+     *
+     * The lookup key used to be the builtin type name, which collapses every
+     * object to "object" — so the obvious use case (a converter for one value
+     * object) could not be expressed without also hijacking every other object
+     * property in the model.
+     */
+    #[Test]
+    public function appliesACustomTypeRegisteredUnderAClassName(): void
+    {
+        $xml = $this->getXmlEncoder()
+            ->addType(Money::class, static fn (string $name, Money $value): string => '12.50 EUR')
+            ->map(new MoneyHost());
+
+        self::assertXmlStringEqualsXmlString(
+            <<<'XML'
+                <?xml version="1.0" encoding="UTF-8"?>
+                <moneyHost>
+                    <amount>12.50 EUR</amount>
+                    <author>
+                        <name>Jane Doe</name>
+                    </author>
+                </moneyHost>
+                XML,
+            (string) $xml
+        );
+    }
+
+    /**
+     * The registered name is compared against the property's declared type —
+     * the hierarchy is not walked, and a collection is not unwrapped.
+     *
+     * Pinned because both are the obvious next thing a reader tries after the
+     * class-specific registration works, and both fail silently: the entry
+     * falls through to the scalar path, which yields an empty element.
+     */
+    #[Test]
+    public function doesNotApplyAClassKeyToACollectionOfThatClass(): void
+    {
+        $host = new MoneyBag();
+
+        $xml = $this->getXmlEncoder()
+            ->addType(Money::class, static fn (string $name, array $value): string => 'converted')
+            ->map($host);
+
+        self::assertXmlStringEqualsXmlString(
+            <<<'XML'
+                <?xml version="1.0" encoding="UTF-8"?>
+                <moneyBag>
+                    <items/>
+                    <items/>
+                </moneyBag>
+                XML,
+            (string) $xml
+        );
+    }
+
+    /**
+     * The class key is not resolved through the inheritance chain either: a
+     * converter registered for the parent class does not fire for a property
+     * declared as a subclass, and the entry then renders as an empty element.
+     */
+    #[Test]
+    public function doesNotApplyAClassKeyToASubclassProperty(): void
+    {
+        $xml = $this->getXmlEncoder()
+            ->addType(Money::class, static fn (string $name, SpecialMoney $value): string => 'converted')
+            ->map(new SpecialMoneyHost());
+
+        self::assertXmlStringEqualsXmlString(
+            <<<'XML'
+                <?xml version="1.0" encoding="UTF-8"?>
+                <specialMoneyHost>
+                    <amount/>
+                </specialMoneyHost>
+                XML,
+            (string) $xml
+        );
+    }
+
+    /**
+     * The encoding boundary is drawn by the list extractor, not by the
+     * visibility of the backing field, and values are then read as fields.
+     *
+     * Both halves matter and they disagree in one direction: a private field
+     * with a public accessor IS reported by ReflectionExtractor and therefore
+     * encoded, while a purely virtual accessor has no field to read and is
+     * dropped. Accessor transformations are consequently not applied.
+     */
+    #[Test]
+    public function encodesWhatTheExtractorReportsAndReadsItAsAField(): void
+    {
+        $xml = (string) $this->getXmlEncoder()->map(new VisibilityHost());
+
+        self::assertXmlStringEqualsXmlString(
+            <<<'XML'
+                <?xml version="1.0" encoding="UTF-8"?>
+                <visibilityHost>
+                    <visible>public</visible>
+                    <hidden>private-with-getter</hidden>
+                    <transformed>from-field</transformed>
+                </visibilityHost>
+                XML,
+            $xml
+        );
+
+        self::assertStringNotContainsString('computed', $xml);
+    }
+
+    /**
+     * A value that encodes to an empty string stays a self-closing element.
+     *
+     * Pinned with an exact comparison: assertXmlStringEqualsXmlString treats
+     * `<a/>` and `<a></a>` as equal, so it cannot see this at all.
+     */
+    #[Test]
+    public function keepsAnEmptyValueSelfClosing(): void
+    {
+        $host       = new PlainBody();
+        $host->body = '';
+
+        self::assertStringContainsString(
+            '<body/>',
+            (string) $this->getXmlEncoder()->map($host)
+        );
+    }
+
+    /**
+     * Parses the encoder output back and returns the document element.
+     *
+     * Escaping cannot be asserted with assertXmlStringEqualsXmlString: that
+     * assertion normalises entity spelling away, which is exactly the dimension
+     * under test here.
+     *
+     * @param string $xml       Encoder output
+     * @param string $onFailure Diagnostic shown when the output does not parse
+     *
+     * @return DOMElement
+     */
+    private function parseDocumentElement(
+        string $xml,
+        string $onFailure = 'Encoder produced XML that cannot be parsed back',
+    ): DOMElement {
+        $document = new DOMDocument();
+
+        // Capture libxml errors internally: on the failure path loadXML() emits
+        // a PHP warning, which the test runner turns into an exception before
+        // the assertion below can report what actually went wrong.
+        $previous = libxml_use_internal_errors(true);
+        $loaded   = $document->loadXML($xml);
+
+        libxml_clear_errors();
+        libxml_use_internal_errors($previous);
+
+        self::assertTrue($loaded, $onFailure);
+
+        $documentElement = $document->documentElement;
+
+        self::assertInstanceOf(DOMElement::class, $documentElement);
+
+        return $documentElement;
+    }
+
+    /**
+     * The builtin key keeps working as the catch-all, and the class-specific
+     * registration wins over it when both are present.
+     */
+    #[Test]
+    public function prefersTheClassSpecificCustomTypeOverTheBuiltinCatchAll(): void
+    {
+        $xml = $this->getXmlEncoder()
+            ->addType('object', static fn (string $name, object $value): string => 'any-object')
+            ->addType(Money::class, static fn (string $name, Money $value): string => 'money')
+            ->map(new MoneyHost());
+
+        self::assertXmlStringEqualsXmlString(
+            <<<'XML'
+                <?xml version="1.0" encoding="UTF-8"?>
+                <moneyHost>
+                    <amount>money</amount>
+                    <author>any-object</author>
+                </moneyHost>
+                XML,
+            (string) $xml
+        );
+    }
+
+    /**
+     * An already-encoded value must not lose a level of escaping on the way
+     * out, otherwise a round trip silently rewrites the data.
+     */
+    #[Test]
+    public function preservesAnAlreadyEncodedValue(): void
+    {
+        $root = $this->parseDocumentElement(
+            (string) $this->getXmlEncoder()->map(new EscapeHost())
+        );
+
+        self::assertSame(
+            'x &amp; y',
+            $root->getElementsByTagName('preencoded')->item(0)?->textContent
+        );
+    }
+
+    /**
+     * The attribute path already escaped correctly; pinning it keeps the two
+     * paths from drifting apart again.
+     */
+    #[Test]
+    public function preservesSignificantCharactersOnTheAttributePath(): void
+    {
+        $root = $this->parseDocumentElement(
+            (string) $this->getXmlEncoder()->map(new EscapeHost())
+        );
+
+        self::assertSame('a & b < c', $root->getAttribute('attribute'));
+    }
+
+    /**
+     * A value carrying XML-significant characters has to arrive unchanged. The
+     * element path is the one that lost content: an unescaped ampersand
+     * truncated everything after it.
+     */
+    #[Test]
+    public function preservesSignificantCharactersOnTheElementPath(): void
+    {
+        $root = $this->parseDocumentElement(
+            (string) $this->getXmlEncoder()->map(new EscapeHost())
+        );
+
+        self::assertSame(
+            'Tom & <b>Jerry</b>',
+            $root->getElementsByTagName('element')->item(0)?->textContent
+        );
+    }
+
+    /**
+     * The text-node path likewise already escaped correctly.
+     */
+    #[Test]
+    public function preservesSignificantCharactersOnTheTextNodePath(): void
+    {
+        $root = $this->parseDocumentElement(
+            (string) $this->getXmlEncoder()->map(new EscapeMarkerHost())
+        );
+
+        self::assertSame('raw & <b>text</b>', $root->textContent);
+        self::assertSame('EUR & GBP', $root->getAttribute('currency'));
+    }
+
+    /**
+     * The third write path.
+     *
+     * A CDATA section is not terminated by an entity but by the literal
+     * sequence `]]>`, so escaping here is structural. The value is parsed back
+     * rather than string-matched: libxml splits the sequence across two
+     * sections, which a substring assertion would either miss or mis-report.
+     */
+    #[Test]
+    public function preservesTheTerminatorSequenceInACDataSection(): void
+    {
+        $root = $this->parseDocumentElement(
+            (string) $this->getXmlEncoder()->map(new EscapeCDataHost())
+        );
+
+        // A CDATA-marked property becomes the content of the class element
+        // itself, so the value is read off the document element.
+        self::assertSame('a]]>b', $root->textContent);
+    }
+
+    /**
+     * The costly half of the collection boundary.
+     *
+     * A missed class key is harmless only while the class does not implement
+     * the marker interface — then the entry renders empty. Implement it, and the
+     * encoder walks the object instead, so a closure registered to redact or
+     * format a value silently emits the untouched contents. That is fail-open,
+     * and it is the shape a domain value object most plausibly has.
+     */
+    #[Test]
+    public function walksTheEntriesWhenAMissedClassKeyMeetsTheMarkerInterface(): void
+    {
+        $encoder = $this->getXmlEncoder()
+            ->addType(SerializableMoney::class, static fn (string $name, SerializableMoney $value): string => '[redacted]');
+
+        $result = (string) $encoder->map(new SerializableMoneyBag());
+
+        // The closure did not fire ...
+        self::assertStringNotContainsString('[redacted]', $result);
+
+        // ... and the value it was meant to replace is in the output instead.
+        self::assertStringContainsString('1250', $result);
     }
 }

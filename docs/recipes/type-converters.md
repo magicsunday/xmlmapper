@@ -1,15 +1,18 @@
 # Custom types
 
 `addType()` registers a closure that transforms every property value of a given
-builtin type before it is written. It is the hook for formatting values without
+class or builtin type before it is written. It is the hook for formatting values without
 changing the model.
 
 ```php
 public function addType(string $type, Closure $closure): $this;
 ```
 
-- `$type` is the **resolved builtin type name** of the property: `bool`, `int`,
-  `float`, `string`, `array` or `object`.
+- `$type` is either a **fully qualified class name** or the **resolved builtin
+  type name** of the property: `bool`, `int`, `float`, `string`, `array` or
+  `object`. A class name is matched first, so a converter can target one value
+  object; `object` remains available as the catch-all for every other object
+  property.
 - The closure signature is `fn (string $name, mixed $value): mixed`. `$name` is the
   (already converted) element name; `$value` is the property value. The returned
   value replaces the original.
@@ -47,6 +50,46 @@ $encoder->addType(
 
 A `@var string[]` property holding `['a', 'b']` then yields `<items>A</items>` /
 `<items>B</items>`.
+
+## Targeting one class
+
+Registering under a class name applies the closure to properties of that class
+only:
+
+```php
+$encoder
+    ->addType(Money::class, fn (string $name, mixed $value): string => $value->format())
+    ->addType('object', fn (string $name, mixed $value): string => '[object]');
+```
+
+`Money` properties go through the first closure, every other object property
+through the second. Without the class key, both would collapse onto `object`.
+
+A class key matches the property's **own declared type** only — it is not
+resolved through the inheritance chain, so a converter registered for a parent
+class does not fire for a property declared as a subclass. A collection of
+that class (`@var Money[]`) likewise resolves to the builtin key `array`, so the class
+closure is not applied per entry — and because `Money` does not implement
+`XmlSerializable`, each entry then renders as an empty element without an error.
+
+If the class **does** implement `XmlSerializable`, a missed class key is not
+harmless: the encoder walks the object and writes out every property the
+extractor reports. A closure registered to redact or format a value therefore
+emits the untouched contents instead. Do not rely on `addType()` to keep a value
+out of the output — neither for a collection of that class, nor for a property
+declared as a subclass. Registering under an interface does work, but only when
+the property is itself declared as that interface: the lookup compares the
+registered name against the declared one, so the rule is the same in every case.
+
+Register the collection under `array` and convert the entries yourself:
+
+```php
+$encoder->addType(
+    'array',
+    static fn (string $name, mixed $value): array
+        => array_map(static fn (Money $money): string => $money->format(), $value)
+);
+```
 
 ## Union-typed properties
 
