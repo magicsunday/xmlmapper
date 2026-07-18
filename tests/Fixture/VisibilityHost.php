@@ -48,8 +48,9 @@ class VisibilityHost implements XmlSerializable
     }
 
     /**
-     * A private field whose accessor deliberately returns something else, so a
-     * field read and an accessor read become distinguishable in the output.
+     * A private field whose accessor formats it, so a field read and an accessor
+     * read become distinguishable in the output — the shape the recipe warns
+     * about when it says a formatting getter has no effect.
      *
      * @var string
      */
@@ -62,7 +63,7 @@ class VisibilityHost implements XmlSerializable
      */
     public function getTransformed(): string
     {
-        return 'from-accessor';
+        return strtoupper($this->transformed);
     }
 
     /**
