@@ -29,7 +29,7 @@ class EscapeHost implements XmlSerializable
      *
      * @var string
      */
-    public string $element = 'Tom & Jerry';
+    public string $element = 'Tom & <b>Jerry</b>';
 
     /**
      * A value that already contains an entity. It has to survive a round trip

@@ -481,7 +481,7 @@ class XmlEncoderTest extends TestCase
         );
 
         self::assertSame(
-            'Tom & Jerry',
+            'Tom & <b>Jerry</b>',
             $root->getElementsByTagName('element')->item(0)?->textContent
         );
     }
