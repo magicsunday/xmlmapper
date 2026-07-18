@@ -26,6 +26,7 @@ use MagicSunday\Test\Fixture\NativeWithForeignAttribute;
 use MagicSunday\Test\Fixture\NativeWithForeignDocblock;
 use MagicSunday\Test\Fixture\Person;
 use MagicSunday\Test\Fixture\Price;
+use MagicSunday\Test\Fixture\SpecialMoney;
 use MagicSunday\Test\Fixture\SpecialMoneyHost;
 use MagicSunday\Test\Fixture\UnionObjectHost;
 use MagicSunday\Test\Fixture\UnionProperty;
@@ -447,7 +448,7 @@ class XmlEncoderTest extends TestCase
     public function appliesACustomTypeRegisteredUnderAClassName(): void
     {
         $xml = $this->getXmlEncoder()
-            ->addType(Money::class, static fn (string $name, mixed $value): string => '12.50 EUR')
+            ->addType(Money::class, static fn (string $name, Money $value): string => '12.50 EUR')
             ->map(new MoneyHost());
 
         self::assertXmlStringEqualsXmlString(
@@ -472,8 +473,8 @@ class XmlEncoderTest extends TestCase
     public function prefersTheClassSpecificCustomTypeOverTheBuiltinCatchAll(): void
     {
         $xml = $this->getXmlEncoder()
-            ->addType('object', static fn (string $name, mixed $value): string => 'any-object')
-            ->addType(Money::class, static fn (string $name, mixed $value): string => 'money')
+            ->addType('object', static fn (string $name, object $value): string => 'any-object')
+            ->addType(Money::class, static fn (string $name, Money $value): string => 'money')
             ->map(new MoneyHost());
 
         self::assertXmlStringEqualsXmlString(
@@ -502,7 +503,7 @@ class XmlEncoderTest extends TestCase
         $host = new MoneyBag();
 
         $xml = $this->getXmlEncoder()
-            ->addType(Money::class, static fn (string $name, mixed $value): string => 'converted')
+            ->addType(Money::class, static fn (string $name, array $value): string => 'converted')
             ->map($host);
 
         self::assertXmlStringEqualsXmlString(
@@ -526,7 +527,7 @@ class XmlEncoderTest extends TestCase
     public function doesNotApplyAClassKeyToASubclassProperty(): void
     {
         $xml = $this->getXmlEncoder()
-            ->addType(Money::class, static fn (string $name, mixed $value): string => 'converted')
+            ->addType(Money::class, static fn (string $name, SpecialMoney $value): string => 'converted')
             ->map(new SpecialMoneyHost());
 
         self::assertXmlStringEqualsXmlString(

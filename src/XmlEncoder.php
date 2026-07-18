@@ -120,7 +120,9 @@ class XmlEncoder
     /**
      * Add a custom type.
      *
-     * @param string  $type    The type name
+     * @param string  $type    A fully qualified class name, or a builtin type name
+     *                         ("bool", "int", "float", "string", "array", "object").
+     *                         A class name takes precedence over the builtin key.
      * @param Closure $closure The closure to execute for the defined type
      *
      * @return $this

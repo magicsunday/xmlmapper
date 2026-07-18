@@ -29,10 +29,14 @@ skipped.
 
 ### `addType(string $type, Closure $closure): $this`
 
-Registers a closure that transforms every value whose resolved builtin type name
-equals `$type` (`bool`, `int`, `float`, `string`, `array`, `object`). The closure
-receives `(string $name, mixed $value)` and returns the replacement value. Returns
-the encoder for chaining. See [Custom types](recipes/type-converters.md).
+Registers a closure that transforms every value whose property type matches
+`$type`. `$type` is either a fully qualified class name or a resolved builtin type
+name (`bool`, `int`, `float`, `string`, `array`, `object`); the class name is
+matched first, so `object` stays available as the catch-all for every other object
+property. A class key is matched against the property's own declared type — not
+through the inheritance chain, and not through a collection of that class. The
+closure receives `(string $name, mixed $value)` and returns the replacement value.
+Returns the encoder for chaining. See [Custom types](recipes/type-converters.md).
 
 ## `MagicSunday\XmlSerializable`
 

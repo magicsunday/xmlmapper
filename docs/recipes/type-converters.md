@@ -1,7 +1,7 @@
 # Custom types
 
 `addType()` registers a closure that transforms every property value of a given
-builtin type before it is written. It is the hook for formatting values without
+class or builtin type before it is written. It is the hook for formatting values without
 changing the model.
 
 ```php
