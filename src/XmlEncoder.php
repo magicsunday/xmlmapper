@@ -108,9 +108,9 @@ class XmlEncoder
         PropertyInfoExtractorInterface $extractor,
         ?PropertyNameConverterInterface $nameConverter = null,
     ) {
-        $this->domDocument                = new DOMDocument('1.0', 'UTF-8');
-        $this->domDocument->xmlStandalone = false;
-        $this->domDocument->formatOutput  = true;
+        // A throwaway document so the property is always initialised; map()
+        // rebuilds a fresh one per call and never reads this instance.
+        $this->domDocument = new DOMDocument('1.0', 'UTF-8');
 
         $this->defaultType   = new BuiltinType(TypeIdentifier::STRING);
         $this->extractor     = $extractor;
@@ -148,6 +148,14 @@ class XmlEncoder
         if ($this->nameConverter instanceof PropertyNameConverterInterface) {
             $rootElementName = $this->nameConverter->convert($rootElementName);
         }
+
+        // Build a fresh document per call so repeated map() calls never append to
+        // the previous run's root (which would yield malformed XML with multiple
+        // root elements). Configuring xmlStandalone and formatOutput here keeps
+        // the output of a single call identical to the previous behaviour.
+        $this->domDocument                = new DOMDocument('1.0', 'UTF-8');
+        $this->domDocument->xmlStandalone = false;
+        $this->domDocument->formatOutput  = true;
 
         // Encode given object instance. Set the short name of class as surrounding XML tag
         $this->encodeObject(

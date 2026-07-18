@@ -429,4 +429,51 @@ class XmlEncoderTest extends TestCase
             (string) $this->getXmlEncoder()->map($host)
         );
     }
+
+    /**
+     * A second map() call on the same encoder instance produces well-formed XML
+     * again: the document is rebuilt per call instead of appending a new root
+     * alongside the previous call's root, which would yield a document with
+     * multiple root elements.
+     */
+    #[Test]
+    public function mapIsRepeatableOnSameInstance(): void
+    {
+        $encoder = $this->getXmlEncoder();
+        $person  = new Person();
+
+        $first  = (string) $encoder->map($person);
+        $second = (string) $encoder->map($person);
+
+        self::assertSame($first, $second);
+
+        $document = new \DOMDocument();
+        $document->loadXML($second);
+
+        self::assertSame('person', $document->documentElement->tagName);
+    }
+
+    /**
+     * The repeated call pins the document structure, including the XML
+     * declaration and the root element produced on the per-call document.
+     */
+    #[Test]
+    public function mapProducesIdenticalOutputAcrossRepeatedCalls(): void
+    {
+        $encoder = $this->getXmlEncoder();
+        $person  = new Person();
+
+        $expected = <<<'XML'
+            <?xml version="1.0" encoding="UTF-8"?>
+            <person>
+                <firstName>John</firstName>
+                <homeTown>Berlin</homeTown>
+                <age>42</age>
+                <active>1</active>
+            </person>
+            XML;
+
+        self::assertXmlStringEqualsXmlString($expected, (string) $encoder->map($person));
+        self::assertXmlStringEqualsXmlString($expected, (string) $encoder->map($person));
+    }
 }
