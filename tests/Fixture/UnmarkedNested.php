@@ -35,6 +35,9 @@ class UnmarkedNested implements XmlSerializable
     public function __construct()
     {
         $this->inner = new class {
+            /**
+             * @var string
+             */
             public string $value = 'lost';
         };
     }
