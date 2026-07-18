@@ -19,6 +19,7 @@ use MagicSunday\Test\Fixture\Book;
 use MagicSunday\Test\Fixture\Chapter;
 use MagicSunday\Test\Fixture\Comment;
 use MagicSunday\Test\Fixture\CustomTypeHost;
+use MagicSunday\Test\Fixture\EscapeCDataHost;
 use MagicSunday\Test\Fixture\EscapeHost;
 use MagicSunday\Test\Fixture\EscapeMarkerHost;
 use MagicSunday\Test\Fixture\NativeCData;
@@ -547,5 +548,25 @@ class XmlEncoderTest extends TestCase
             '<body/>',
             (string) $this->getXmlEncoder()->map($host)
         );
+    }
+
+    /**
+     * The third write path.
+     *
+     * A CDATA section is not terminated by an entity but by the literal
+     * sequence `]]>`, so escaping here is structural. The value is parsed back
+     * rather than string-matched: libxml splits the sequence across two
+     * sections, which a substring assertion would either miss or mis-report.
+     */
+    #[Test]
+    public function preservesTheTerminatorSequenceInACDataSection(): void
+    {
+        $root = $this->parseDocumentElement(
+            (string) $this->getXmlEncoder()->map(new EscapeCDataHost())
+        );
+
+        // A CDATA-marked property becomes the content of the class element
+        // itself, so the value is read off the document element.
+        self::assertSame('a]]>b', $root->textContent);
     }
 }
