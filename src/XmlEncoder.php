@@ -116,7 +116,9 @@ class XmlEncoder
     /**
      * Add a custom type.
      *
-     * @param string  $type    The type name
+     * @param string  $type    A fully qualified class name, or a builtin type name
+     *                         ("bool", "int", "float", "string", "array", "object").
+     *                         A class name takes precedence over the builtin key.
      * @param Closure $closure The closure to execute for the defined type
      *
      * @return $this
@@ -209,13 +211,13 @@ class XmlEncoder
 
             $propertyValue = $property->getValue($instance);
             $propertyType  = $this->getType($className, $propertyName);
-            $builtinType   = $this->getBuiltinTypeName($propertyType);
+            $customTypeKey = $this->getCustomTypeKey($propertyType);
 
-            if ($this->isCustomType($builtinType)) {
+            if ($customTypeKey !== null) {
                 $propertyValue = $this->callCustomClosure(
                     $propertyName,
                     $propertyValue,
-                    $builtinType
+                    $customTypeKey
                 );
             }
 
@@ -304,18 +306,19 @@ class XmlEncoder
     }
 
     /**
-     * Returns the builtin type name used to look up custom type closures. Custom
-     * type closures are registered under the builtin type name, so object and
+     * Maps an already-unwrapped base type onto its builtin name, so object and
      * collection types resolve to "object" and "array" respectively.
      *
-     * @param Type $type
+     * This is the fallback key {@see getCustomTypeKey()} falls back to once the
+     * class-name lookup has missed — it is no longer the lookup itself.
+     *
+     * @param Type $baseType The property type with its nullable wrapper already
+     *                       removed by {@see getBaseType()}
      *
      * @return string
      */
-    private function getBuiltinTypeName(Type $type): string
+    private function getBuiltinTypeName(Type $baseType): string
     {
-        $baseType = $this->getBaseType($type);
-
         if ($baseType instanceof BuiltinType) {
             return $baseType->getTypeIdentifier()->value;
         }
@@ -476,13 +479,23 @@ class XmlEncoder
         if ($value instanceof XmlSerializable) {
             $this->encodeObject($parent, $name, $value);
         } else {
-            // Write encoded value directly into XML output
-            $parent->appendChild(
-                $this->domDocument->createElement(
-                    $name,
-                    $this->encodeValue($value)
-                )
-            );
+            // The value goes in as a text node rather than through the second
+            // argument of createElement(): that argument is not escaped, so an
+            // ampersand truncated the rest of the value and an already-encoded
+            // value lost a level of escaping on every round trip.
+            $element = $this->domDocument->createElement($name);
+            $encoded = $this->encodeValue($value);
+
+            // Only append a text node when there is text: an empty one would
+            // turn `<name/>` into `<name></name>` for every value that encodes
+            // to an empty string.
+            if ($encoded !== '') {
+                $element->appendChild(
+                    $this->domDocument->createTextNode($encoded)
+                );
+            }
+
+            $parent->appendChild($element);
         }
     }
 
@@ -551,6 +564,32 @@ class XmlEncoder
     private function isCustomType(string $typeName): bool
     {
         return array_key_exists($typeName, $this->types);
+    }
+
+    /**
+     * Returns the key under which a custom type is registered for the given
+     * property type, or NULL when none applies.
+     *
+     * The fully qualified class name is tried first so a converter can target
+     * one value object; the builtin name stays available as the catch-all.
+     * Without the first step every object collapses to "object", which makes a
+     * converter for a single class impossible to express.
+     *
+     * @param Type $type The resolved property type
+     *
+     * @return string|null The registration key, or NULL when no custom type applies
+     */
+    private function getCustomTypeKey(Type $type): ?string
+    {
+        $baseType = $this->getBaseType($type);
+
+        if (($baseType instanceof ObjectType) && $this->isCustomType($baseType->getClassName())) {
+            return $baseType->getClassName();
+        }
+
+        $builtinType = $this->getBuiltinTypeName($baseType);
+
+        return $this->isCustomType($builtinType) ? $builtinType : null;
     }
 
     /**
