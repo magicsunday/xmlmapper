@@ -170,8 +170,7 @@ class XmlEncoder
      */
     private function encodeElement(DOMElement $domElement, XmlSerializable $instance): void
     {
-        /** @var class-string $className */
-        $className  = $this->getClassName($instance);
+        $className  = $instance::class;
         $properties = $this->extractor->getProperties($className) ?? [];
         $reflection = new ReflectionObject($instance);
 
@@ -205,7 +204,7 @@ class XmlEncoder
                 : $propertyName;
 
             // Process attributes
-            if ($this->isXmlAttributeAnnotation($className, $propertyName)) {
+            if ($this->hasPropertyAnnotation($className, $propertyName, XmlAttribute::class)) {
                 $domElement
                     ->setAttribute(
                         $xmlPropertyName,
@@ -216,7 +215,7 @@ class XmlEncoder
             }
 
             // Process CDATA section
-            if ($this->isXmlCDataSectionAnnotation($className, $propertyName)) {
+            if ($this->hasPropertyAnnotation($className, $propertyName, XmlCDataSection::class)) {
                 $domElement
                     ->appendChild(
                         $this->domDocument->createCDATASection(
@@ -228,7 +227,7 @@ class XmlEncoder
             }
 
             // Process raw text node
-            if ($this->isXmlNodeValueAnnotation($className, $propertyName)) {
+            if ($this->hasPropertyAnnotation($className, $propertyName, XmlNodeValue::class)) {
                 $domElement
                     ->appendChild(
                         $this->domDocument->createTextNode(
@@ -318,57 +317,6 @@ class XmlEncoder
     private function isCollection(Type $type): bool
     {
         return $this->getBaseType($type) instanceof CollectionType;
-    }
-
-    /**
-     * Returns TRUE if the property contains an "XmlAttribute" annotation.
-     *
-     * @param class-string $className    The class name of the initial element
-     * @param string       $propertyName The name of the property
-     *
-     * @return bool
-     */
-    private function isXmlAttributeAnnotation(string $className, string $propertyName): bool
-    {
-        return $this->hasPropertyAnnotation(
-            $className,
-            $propertyName,
-            XmlAttribute::class
-        );
-    }
-
-    /**
-     * Returns TRUE if the property contains an "XmlNodeValue" annotation.
-     *
-     * @param class-string $className    The class name of the initial element
-     * @param string       $propertyName The name of the property
-     *
-     * @return bool
-     */
-    private function isXmlNodeValueAnnotation(string $className, string $propertyName): bool
-    {
-        return $this->hasPropertyAnnotation(
-            $className,
-            $propertyName,
-            XmlNodeValue::class
-        );
-    }
-
-    /**
-     * Returns TRUE if the property contains an "XmlCDataSection" annotation.
-     *
-     * @param class-string $className    The class name of the initial element
-     * @param string       $propertyName The name of the property
-     *
-     * @return bool
-     */
-    private function isXmlCDataSectionAnnotation(string $className, string $propertyName): bool
-    {
-        return $this->hasPropertyAnnotation(
-            $className,
-            $propertyName,
-            XmlCDataSection::class
-        );
     }
 
     /**
@@ -553,18 +501,6 @@ class XmlEncoder
         }
 
         return '';
-    }
-
-    /**
-     * Returns the name of the given class instance.
-     *
-     * @param XmlSerializable $instance
-     *
-     * @return class-string
-     */
-    private function getClassName(XmlSerializable $instance): string
-    {
-        return (new ReflectionClass($instance))->getName();
     }
 
     /**
