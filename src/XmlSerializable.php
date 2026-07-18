@@ -12,7 +12,12 @@ declare(strict_types=1);
 namespace MagicSunday;
 
 /**
- * Objects implementing XmlSerializable can customize their XML representation when encoded.
+ * Marks a class as encodable by the XML encoder.
+ *
+ * Every class passed to XmlEncoder::map(), and every nested object that should
+ * be encoded recursively rather than flattened, has to implement it. It declares
+ * no methods: the XML representation is shaped by the property marker attributes
+ * and by custom type closures, not through this interface.
  *
  * @author  Rico Sonntag <mail@ricosonntag.de>
  * @license https://opensource.org/licenses/MIT

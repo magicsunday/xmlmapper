@@ -18,7 +18,6 @@
         "ext-xml": "*",
         "ext-dom": "*",
         "symfony/property-info": "^7.3 || ^8.0",
-        "symfony/property-access": "^7.3 || ^8.0",
         "symfony/type-info": "^7.3 || ^8.0",
         "doctrine/inflector": "^2.0"
     },
