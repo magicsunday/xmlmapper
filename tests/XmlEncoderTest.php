@@ -13,6 +13,7 @@ namespace MagicSunday\Test;
 
 use DOMDocument;
 use DOMElement;
+use DOMException;
 use MagicSunday\Test\Fixture\Author;
 use MagicSunday\Test\Fixture\BodyHost;
 use MagicSunday\Test\Fixture\Book;
@@ -33,6 +34,7 @@ use MagicSunday\XmlMapper\Annotation\XmlAttribute;
 use MagicSunday\XmlMapper\Annotation\XmlCDataSection;
 use MagicSunday\XmlMapper\Annotation\XmlNodeValue;
 use MagicSunday\XmlMapper\Converter\CamelCasePropertyNameConverter;
+use MagicSunday\XmlMapper\Converter\PropertyNameConverterInterface;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\Attributes\UsesClass;
@@ -434,6 +436,75 @@ class XmlEncoderTest extends TestCase
     }
 
     /**
+     * One exact-output assertion over a minimal fixture.
+     *
+     * The rest of the suite compares through assertXmlStringEqualsXmlString,
+     * which normalises the declaration, whitespace and entity spelling away —
+     * so nothing pinned the bytes that are actually delivered. Note the
+     * `standalone="no"`: the expected strings elsewhere in this file omit it,
+     * and only the normalising assertion hid that mismatch.
+     */
+    #[Test]
+    public function producesTheExactDocumentBytes(): void
+    {
+        // Own encoder purely to skip the name converter, so the expected bytes
+        // carry the raw class short name. Author annotates its property, so one
+        // type extractor suffices — no unexplained variance in a test whose
+        // entire purpose is exactness.
+        //
+        // This pins DOMDocument's own formatting too: the declaration, the
+        // two-space indent and the trailing newline all come from formatOutput.
+        // If that ever changes, expect this to fail as a byte diff rather than
+        // as a semantic one.
+        $extractor = new PropertyInfoExtractor(
+            [new ReflectionExtractor()],
+            [new PhpDocExtractor()]
+        );
+
+        self::assertSame(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>\n"
+            . "<Author>\n"
+            . "  <name>Jane Doe</name>\n"
+            . "</Author>\n",
+            (new XmlEncoder($extractor))->map(new Author())
+        );
+    }
+
+    /**
+     * A name converter is a documented extension point, so a converter that
+     * yields an XML-invalid element name is a reachable path rather than an
+     * exotic one. The exception class is asserted but not its message, which
+     * comes from ext-dom and varies across PHP versions.
+     */
+    #[Test]
+    public function throwsWhenTheConvertedNameIsNotAValidElementName(): void
+    {
+        $extractor = new PropertyInfoExtractor(
+            [new ReflectionExtractor()],
+            [new PhpDocExtractor()]
+        );
+
+        $converter = new class implements PropertyNameConverterInterface {
+            /**
+             * Leaves the root element name alone and produces a leading digit
+             * for every property name, which is not valid for an XML element.
+             *
+             * @param string $name Raw class or property name
+             *
+             * @return string
+             */
+            public function convert(string $name): string
+            {
+                return $name === 'Author' ? $name : '1' . $name;
+            }
+        };
+
+        $this->expectException(DOMException::class);
+
+        (new XmlEncoder($extractor, $converter))->map(new Author());
+    }
+
+    /**
      * The encoder takes its collaborators through the constructor and is
      * therefore a natural candidate for a container service, so a second call
      * has to produce the same document instead of appending a second root
@@ -460,6 +531,28 @@ class XmlEncoderTest extends TestCase
         libxml_use_internal_errors($previous);
 
         self::assertTrue($loaded, 'A repeated map() call produced XML that cannot be parsed back');
+    }
+
+    /**
+     * A typed property that was never assigned is skipped like a null value.
+     *
+     * Reading it raises a native Error, which is outside every documented
+     * guarantee of map() — neither the false return nor DOMException covers it.
+     * Uninitialized typed properties are an ordinary DTO shape, so the encoder
+     * has to tolerate them rather than terminate the whole mapping.
+     */
+    #[Test]
+    public function skipsUninitializedTypedProperties(): void
+    {
+        self::assertXmlStringEqualsXmlString(
+            <<<'XML'
+                <?xml version="1.0" encoding="UTF-8"?>
+                <uninitializedHost>
+                    <filled>value</filled>
+                </uninitializedHost>
+                XML,
+            (string) $this->getXmlEncoder()->map(new UninitializedHost())
+        );
     }
 
     /**
@@ -507,27 +600,5 @@ class XmlEncoderTest extends TestCase
 
         self::assertInstanceOf(DOMElement::class, $author);
         self::assertStringContainsString('<name>Jane Doe</name>', $author->textContent);
-    }
-
-    /**
-     * A typed property that was never assigned is skipped like a null value.
-     *
-     * Reading it raises a native Error, which is outside every documented
-     * guarantee of map() — neither the false return nor DOMException covers it.
-     * Uninitialized typed properties are an ordinary DTO shape, so the encoder
-     * has to tolerate them rather than terminate the whole mapping.
-     */
-    #[Test]
-    public function skipsUninitializedTypedProperties(): void
-    {
-        self::assertXmlStringEqualsXmlString(
-            <<<'XML'
-                <?xml version="1.0" encoding="UTF-8"?>
-                <uninitializedHost>
-                    <filled>value</filled>
-                </uninitializedHost>
-                XML,
-            (string) $this->getXmlEncoder()->map(new UninitializedHost())
-        );
     }
 }
