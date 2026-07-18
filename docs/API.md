@@ -57,5 +57,5 @@ public function convert(string $name): string;
 
 Receives a raw class or property name and returns the element name to use.
 `CamelCasePropertyNameConverter` is the bundled implementation (snake_case →
-camelCase via Symfony's inflector). See
+camelCase via Doctrine's inflector). See
 [Custom name converter](recipes/custom-name-converter.md).
