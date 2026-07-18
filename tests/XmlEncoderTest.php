@@ -11,12 +11,16 @@ declare(strict_types=1);
 
 namespace MagicSunday\Test;
 
+use DOMDocument;
+use DOMElement;
 use MagicSunday\Test\Fixture\Author;
 use MagicSunday\Test\Fixture\BodyHost;
 use MagicSunday\Test\Fixture\Book;
 use MagicSunday\Test\Fixture\Chapter;
 use MagicSunday\Test\Fixture\Comment;
 use MagicSunday\Test\Fixture\CustomTypeHost;
+use MagicSunday\Test\Fixture\EscapeHost;
+use MagicSunday\Test\Fixture\EscapeMarkerHost;
 use MagicSunday\Test\Fixture\NativeCData;
 use MagicSunday\Test\Fixture\NativeMarkers;
 use MagicSunday\Test\Fixture\NativeWithForeignAttribute;
@@ -428,5 +432,92 @@ class XmlEncoderTest extends TestCase
                 XML,
             (string) $this->getXmlEncoder()->map($host)
         );
+    }
+
+    /**
+     * Parses the encoder output back and returns the document element.
+     *
+     * Escaping cannot be asserted with assertXmlStringEqualsXmlString: that
+     * assertion normalises entity spelling away, which is exactly the dimension
+     * under test here.
+     *
+     * @param string $xml Encoder output
+     *
+     * @return DOMElement
+     */
+    private function parseDocumentElement(string $xml): DOMElement
+    {
+        $document = new DOMDocument();
+
+        self::assertTrue($document->loadXML($xml), 'Encoder produced XML that cannot be parsed back');
+
+        $documentElement = $document->documentElement;
+
+        self::assertInstanceOf(DOMElement::class, $documentElement);
+
+        return $documentElement;
+    }
+
+    /**
+     * A value carrying XML-significant characters has to arrive unchanged. The
+     * element path is the one that lost content: an unescaped ampersand
+     * truncated everything after it.
+     */
+    #[Test]
+    public function preservesSignificantCharactersOnTheElementPath(): void
+    {
+        $root = $this->parseDocumentElement(
+            (string) $this->getXmlEncoder()->map(new EscapeHost())
+        );
+
+        self::assertSame(
+            'Tom & Jerry',
+            $root->getElementsByTagName('element')->item(0)?->textContent
+        );
+    }
+
+    /**
+     * An already-encoded value must not lose a level of escaping on the way
+     * out, otherwise a round trip silently rewrites the data.
+     */
+    #[Test]
+    public function preservesAnAlreadyEncodedValue(): void
+    {
+        $root = $this->parseDocumentElement(
+            (string) $this->getXmlEncoder()->map(new EscapeHost())
+        );
+
+        self::assertSame(
+            'x &amp; y',
+            $root->getElementsByTagName('preencoded')->item(0)?->textContent
+        );
+    }
+
+    /**
+     * The attribute path already escaped correctly; pinning it keeps the two
+     * paths from drifting apart again.
+     */
+    #[Test]
+    public function preservesSignificantCharactersOnTheAttributePath(): void
+    {
+        $root = $this->parseDocumentElement(
+            (string) $this->getXmlEncoder()->map(new EscapeHost())
+        );
+
+        self::assertSame('a & b < c', $root->getAttribute('attribute'));
+    }
+
+    /**
+     * The text-node path likewise already escaped correctly.
+     */
+    #[Test]
+    public function preservesSignificantCharactersOnTheTextNodePath(): void
+    {
+        $root = $this->parseDocumentElement(
+            (string) $this->getXmlEncoder()->map(new EscapeMarkerHost())
+        );
+
+        self::assertSame('raw & <b>text</b>', $root->textContent);
+        self::assertSame('EUR & GBP', $root->getAttribute('currency'));
     }
 }
