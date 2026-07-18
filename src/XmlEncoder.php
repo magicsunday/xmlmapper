@@ -279,9 +279,11 @@ class XmlEncoder
     }
 
     /**
-     * Returns the builtin type name used to look up custom type closures. Custom
-     * type closures are registered under the builtin type name, so object and
+     * Maps an already-unwrapped base type onto its builtin name, so object and
      * collection types resolve to "object" and "array" respectively.
+     *
+     * This is the fallback key {@see getCustomTypeKey()} falls back to once the
+     * class-name lookup has missed — it is no longer the lookup itself.
      *
      * @param Type $baseType The property type with its nullable wrapper already
      *                       removed by {@see getBaseType()}
