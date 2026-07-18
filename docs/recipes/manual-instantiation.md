@@ -33,6 +33,12 @@ $encoder = new XmlEncoder($extractor, new CamelCasePropertyNameConverter());
   formats, rounds or redacts its value therefore has no effect on the output,
   and a purely virtual property — an accessor with no backing field — is
   skipped entirely.
+
+  Read the redaction case literally: a `private` field is encoded with its **raw**
+  value even when its public accessor masks it. Neither the visibility of the
+  field nor a masking getter keeps a secret out of the output, and there is
+  currently no per-property opt-out — narrowing the list extractor is the only
+  lever, and it is all-or-nothing.
 - The **type extractors** resolve each property's type, which drives collection
   detection and the custom-type lookup key. `PhpDocExtractor` reads `@var`
   annotations such as `@var Chapter[]`; the `ReflectionExtractor` also contributes

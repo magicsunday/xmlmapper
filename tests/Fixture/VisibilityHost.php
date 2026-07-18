@@ -38,6 +38,15 @@ class VisibilityHost implements XmlSerializable
     private string $hidden = 'private-with-getter';
 
     /**
+     * A private field whose accessor formats it, so a field read and an accessor
+     * read become distinguishable in the output — the shape the recipe warns
+     * about when it says a formatting getter has no effect.
+     *
+     * @var string
+     */
+    private string $transformed = 'from-field';
+
+    /**
      * Exposes the private field, which is what makes the extractor report it.
      *
      * @return string
@@ -46,15 +55,6 @@ class VisibilityHost implements XmlSerializable
     {
         return $this->hidden;
     }
-
-    /**
-     * A private field whose accessor formats it, so a field read and an accessor
-     * read become distinguishable in the output — the shape the recipe warns
-     * about when it says a formatting getter has no effect.
-     *
-     * @var string
-     */
-    private string $transformed = 'from-field';
 
     /**
      * Diverges from its backing field on purpose.
