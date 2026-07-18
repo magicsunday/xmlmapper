@@ -37,8 +37,11 @@ $encoder = new XmlEncoder($extractor, new CamelCasePropertyNameConverter());
   Read the redaction case literally: a `private` field is encoded with its **raw**
   value even when its public accessor masks it. Neither the visibility of the
   field nor a masking getter keeps a secret out of the output, and there is
-  currently no per-property opt-out — narrowing the list extractor is the only
-  lever, and it is all-or-nothing.
+  currently no per-property opt-out. Visibility offers no lever at all, and
+  narrowing the list extractor is the only one on that axis — all-or-nothing.
+  A closure registered through `addType()` can replace the value before it is
+  written (see [Custom types](type-converters.md)), but it keys on the type, so
+  it applies to every property of that type rather than to one.
 - The **type extractors** resolve each property's type, which drives collection
   detection and the custom-type lookup key. `PhpDocExtractor` reads `@var`
   annotations such as `@var Chapter[]`; the `ReflectionExtractor` also contributes
