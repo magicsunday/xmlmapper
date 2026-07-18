@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace MagicSunday\Test;
 
 use DOMDocument;
+use DOMElement;
 use MagicSunday\Test\Fixture\Author;
 use MagicSunday\Test\Fixture\BodyHost;
 use MagicSunday\Test\Fixture\Book;
@@ -474,7 +475,7 @@ class XmlEncoderTest extends TestCase
         // encoder supports, and it makes every object property run the closure.
         $encoder->addType(
             'object',
-            static fn (string $name, mixed $value): string => (string) $encoder->map(new Author())
+            static fn (string $name, object $value): string => (string) $encoder->map(new Author())
         );
 
         $host         = new CustomTypeHost();
@@ -497,9 +498,13 @@ class XmlEncoderTest extends TestCase
         // The inner run has to have produced something as well: asserting only
         // that the outer document survived cannot tell "both ran" apart from
         // "the outer survived and the inner returned nothing".
-        self::assertStringContainsString(
-            '<name>Jane Doe</name>',
-            $document->getElementsByTagName('author')->item(0)->textContent ?? ''
-        );
+        //
+        // The element is pinned before its text is read. A `?? ''` fallback here
+        // would collapse "no author element at all" and "an empty one" into the
+        // same failure message, which is the distinction under test.
+        $author = $document->getElementsByTagName('author')->item(0);
+
+        self::assertInstanceOf(DOMElement::class, $author);
+        self::assertStringContainsString('<name>Jane Doe</name>', $author->textContent);
     }
 }
