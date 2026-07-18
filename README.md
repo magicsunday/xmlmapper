@@ -98,7 +98,11 @@ use Symfony\Component\PropertyInfo\PropertyInfoExtractor;
 
 $extractor = new PropertyInfoExtractor(
     [new ReflectionExtractor()],
-    [new PhpDocExtractor()]
+    // PhpDocExtractor resolves `@var` generics such as `Chapter[]`;
+    // ReflectionExtractor covers native types, so an array property without a
+    // docblock is still recognised as a collection instead of being silently
+    // rendered as one empty element.
+    [new PhpDocExtractor(), new ReflectionExtractor()]
 );
 
 $book         = new Book();

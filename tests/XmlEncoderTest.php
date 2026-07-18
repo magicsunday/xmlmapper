@@ -22,9 +22,11 @@ use MagicSunday\Test\Fixture\NativeMarkers;
 use MagicSunday\Test\Fixture\NativeWithForeignAttribute;
 use MagicSunday\Test\Fixture\NativeWithForeignDocblock;
 use MagicSunday\Test\Fixture\Person;
+use MagicSunday\Test\Fixture\PlainArrayHost;
 use MagicSunday\Test\Fixture\Price;
 use MagicSunday\Test\Fixture\UnionObjectHost;
 use MagicSunday\Test\Fixture\UnionProperty;
+use MagicSunday\Test\Fixture\UnmarkedNested;
 use MagicSunday\XmlEncoder;
 use MagicSunday\XmlMapper\Annotation\XmlAttribute;
 use MagicSunday\XmlMapper\Annotation\XmlCDataSection;
@@ -427,6 +429,72 @@ class XmlEncoderTest extends TestCase
                 </unionObjectHost>
                 XML,
             (string) $this->getXmlEncoder()->map($host)
+        );
+    }
+
+    /**
+     * An array property without a `@var` annotation is recognised as a
+     * collection as long as a type extractor reads native types.
+     *
+     * With only PhpDocExtractor the type resolves to nothing, falls back to
+     * string, and the entries are dropped into a single empty element without
+     * any error — which is why the documented configuration lists both.
+     */
+    #[Test]
+    public function encodesAnArrayPropertyWithoutADocblock(): void
+    {
+        self::assertXmlStringEqualsXmlString(
+            <<<'XML'
+                <?xml version="1.0" encoding="UTF-8"?>
+                <plainArrayHost>
+                    <tags>a</tags>
+                    <tags>b</tags>
+                </plainArrayHost>
+                XML,
+            (string) $this->getXmlEncoder()->map(new PlainArrayHost())
+        );
+    }
+
+    /**
+     * Only PhpDocExtractor: the same property loses its entries. Pinned so the
+     * cost of dropping ReflectionExtractor from the type extractors stays
+     * visible instead of surfacing as missing data in production.
+     */
+    #[Test]
+    public function losesArrayEntriesWhenNoTypeExtractorReadsNativeTypes(): void
+    {
+        $extractor = new PropertyInfoExtractor(
+            [new ReflectionExtractor()],
+            [new PhpDocExtractor()]
+        );
+
+        self::assertXmlStringEqualsXmlString(
+            <<<'XML'
+                <?xml version="1.0" encoding="UTF-8"?>
+                <PlainArrayHost>
+                    <tags/>
+                </PlainArrayHost>
+                XML,
+            (string) (new XmlEncoder($extractor))->map(new PlainArrayHost())
+        );
+    }
+
+    /**
+     * A nested object that does not implement XmlSerializable renders as an
+     * empty element rather than raising anything. Pinned because it is the most
+     * likely mistake when adding a node type, and the symptom points nowhere.
+     */
+    #[Test]
+    public function rendersANestedObjectWithoutTheMarkerInterfaceAsEmpty(): void
+    {
+        self::assertXmlStringEqualsXmlString(
+            <<<'XML'
+                <?xml version="1.0" encoding="UTF-8"?>
+                <unmarkedNested>
+                    <inner/>
+                </unmarkedNested>
+                XML,
+            (string) $this->getXmlEncoder()->map(new UnmarkedNested())
         );
     }
 }

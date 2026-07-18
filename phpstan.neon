@@ -16,3 +16,13 @@ parameters:
 
     excludePaths:
         - %currentWorkingDirectory%/.build/
+
+    ignoreErrors:
+        # The fixture exists precisely to have no `@var` annotation: it pins how
+        # an untyped array property behaves when the type extractors cannot
+        # resolve a value type. Any annotation that satisfied this rule would
+        # also be read by PhpDocExtractor and defeat the test.
+        -
+            identifier: missingType.iterableValue
+            message: '#Property MagicSunday\\Test\\Fixture\\PlainArrayHost::\$tags type has no value type specified in iterable type array\.#'
+            path: %currentWorkingDirectory%/tests/Fixture/PlainArrayHost.php

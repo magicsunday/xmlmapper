@@ -34,7 +34,9 @@ class TestCase extends \PHPUnit\Framework\TestCase
     protected function getXmlEncoder(): XmlEncoder
     {
         $listExtractors = [new ReflectionExtractor()];
-        $typeExtractors = [new PhpDocExtractor()];
+        // Mirrors the configuration the README documents: PhpDocExtractor for
+        // `@var` generics, ReflectionExtractor for native types.
+        $typeExtractors = [new PhpDocExtractor(), new ReflectionExtractor()];
         $extractor      = new PropertyInfoExtractor($listExtractors, $typeExtractors);
 
         return new XmlEncoder(
