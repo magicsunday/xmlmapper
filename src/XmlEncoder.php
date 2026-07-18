@@ -59,7 +59,7 @@ class XmlEncoder
     ];
 
     /**
-     * XMLWriter instance.
+     * The document being built by the current map() call.
      *
      * @var DOMDocument
      */
@@ -108,10 +108,6 @@ class XmlEncoder
         PropertyInfoExtractorInterface $extractor,
         ?PropertyNameConverterInterface $nameConverter = null,
     ) {
-        $this->domDocument                = new DOMDocument('1.0', 'UTF-8');
-        $this->domDocument->xmlStandalone = false;
-        $this->domDocument->formatOutput  = true;
-
         $this->defaultType   = new BuiltinType(TypeIdentifier::STRING);
         $this->extractor     = $extractor;
         $this->nameConverter = $nameConverter;
@@ -143,20 +139,41 @@ class XmlEncoder
      */
     public function map(XmlSerializable $instance): string|false
     {
-        $rootElementName = $this->getClassShortName($instance);
+        // A fresh document per call: keeping one for the lifetime of the encoder
+        // made a second call append another root element to the first result,
+        // which is a truthy string that no XML parser accepts.
+        //
+        // The previous document is restored afterwards so a nested call — a
+        // custom-type closure mapping a sub-object through the same encoder —
+        // cannot pull the document out from under the outer run.
+        $previousDocument = $this->domDocument ?? null;
 
-        if ($this->nameConverter instanceof PropertyNameConverterInterface) {
-            $rootElementName = $this->nameConverter->convert($rootElementName);
+        try {
+            $this->domDocument                = new DOMDocument('1.0', 'UTF-8');
+            $this->domDocument->xmlStandalone = false;
+            $this->domDocument->formatOutput  = true;
+
+            $rootElementName = $this->getClassShortName($instance);
+
+            if ($this->nameConverter instanceof PropertyNameConverterInterface) {
+                $rootElementName = $this->nameConverter->convert($rootElementName);
+            }
+
+            // Encode given object instance. Set the short name of class as surrounding XML tag
+            $this->encodeObject(
+                null,
+                $rootElementName,
+                $instance
+            );
+
+            return $this->domDocument->saveXML();
+        } finally {
+            if ($previousDocument instanceof DOMDocument) {
+                $this->domDocument = $previousDocument;
+            } else {
+                unset($this->domDocument);
+            }
         }
-
-        // Encode given object instance. Set the short name of class as surrounding XML tag
-        $this->encodeObject(
-            null,
-            $rootElementName,
-            $instance
-        );
-
-        return $this->domDocument->saveXML();
     }
 
     /**
@@ -170,8 +187,7 @@ class XmlEncoder
      */
     private function encodeElement(DOMElement $domElement, XmlSerializable $instance): void
     {
-        /** @var class-string $className */
-        $className  = $this->getClassName($instance);
+        $className  = $instance::class;
         $properties = $this->extractor->getProperties($className) ?? [];
         $reflection = new ReflectionObject($instance);
 
@@ -181,7 +197,16 @@ class XmlEncoder
                 continue;
             }
 
-            $property      = $reflection->getProperty($propertyName);
+            $property = $reflection->getProperty($propertyName);
+
+            // A typed property that was never assigned raises a native Error on
+            // read. That is outside every guarantee map() documents, and an
+            // unset optional property is an ordinary DTO shape, so treat it the
+            // same way as a null value: skip it.
+            if (!$property->isInitialized($instance)) {
+                continue;
+            }
+
             $propertyValue = $property->getValue($instance);
             $propertyType  = $this->getType($className, $propertyName);
             $builtinType   = $this->getBuiltinTypeName($propertyType);
@@ -205,7 +230,7 @@ class XmlEncoder
                 : $propertyName;
 
             // Process attributes
-            if ($this->isXmlAttributeAnnotation($className, $propertyName)) {
+            if ($this->hasPropertyAnnotation($className, $propertyName, XmlAttribute::class)) {
                 $domElement
                     ->setAttribute(
                         $xmlPropertyName,
@@ -216,7 +241,7 @@ class XmlEncoder
             }
 
             // Process CDATA section
-            if ($this->isXmlCDataSectionAnnotation($className, $propertyName)) {
+            if ($this->hasPropertyAnnotation($className, $propertyName, XmlCDataSection::class)) {
                 $domElement
                     ->appendChild(
                         $this->domDocument->createCDATASection(
@@ -228,7 +253,7 @@ class XmlEncoder
             }
 
             // Process raw text node
-            if ($this->isXmlNodeValueAnnotation($className, $propertyName)) {
+            if ($this->hasPropertyAnnotation($className, $propertyName, XmlNodeValue::class)) {
                 $domElement
                     ->appendChild(
                         $this->domDocument->createTextNode(
@@ -318,57 +343,6 @@ class XmlEncoder
     private function isCollection(Type $type): bool
     {
         return $this->getBaseType($type) instanceof CollectionType;
-    }
-
-    /**
-     * Returns TRUE if the property contains an "XmlAttribute" annotation.
-     *
-     * @param class-string $className    The class name of the initial element
-     * @param string       $propertyName The name of the property
-     *
-     * @return bool
-     */
-    private function isXmlAttributeAnnotation(string $className, string $propertyName): bool
-    {
-        return $this->hasPropertyAnnotation(
-            $className,
-            $propertyName,
-            XmlAttribute::class
-        );
-    }
-
-    /**
-     * Returns TRUE if the property contains an "XmlNodeValue" annotation.
-     *
-     * @param class-string $className    The class name of the initial element
-     * @param string       $propertyName The name of the property
-     *
-     * @return bool
-     */
-    private function isXmlNodeValueAnnotation(string $className, string $propertyName): bool
-    {
-        return $this->hasPropertyAnnotation(
-            $className,
-            $propertyName,
-            XmlNodeValue::class
-        );
-    }
-
-    /**
-     * Returns TRUE if the property contains an "XmlCDataSection" annotation.
-     *
-     * @param class-string $className    The class name of the initial element
-     * @param string       $propertyName The name of the property
-     *
-     * @return bool
-     */
-    private function isXmlCDataSectionAnnotation(string $className, string $propertyName): bool
-    {
-        return $this->hasPropertyAnnotation(
-            $className,
-            $propertyName,
-            XmlCDataSection::class
-        );
     }
 
     /**
@@ -563,18 +537,6 @@ class XmlEncoder
         }
 
         return '';
-    }
-
-    /**
-     * Returns the name of the given class instance.
-     *
-     * @param XmlSerializable $instance
-     *
-     * @return class-string
-     */
-    private function getClassName(XmlSerializable $instance): string
-    {
-        return (new ReflectionClass($instance))->getName();
     }
 
     /**
