@@ -451,6 +451,7 @@ class XmlEncoderTest extends TestCase
                 <visibilityHost>
                     <visible>public</visible>
                     <hidden>private-with-getter</hidden>
+                    <transformed>from-field</transformed>
                 </visibilityHost>
                 XML,
             $xml

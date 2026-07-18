@@ -48,6 +48,24 @@ class VisibilityHost implements XmlSerializable
     }
 
     /**
+     * A private field whose accessor deliberately returns something else, so a
+     * field read and an accessor read become distinguishable in the output.
+     *
+     * @var string
+     */
+    private string $transformed = 'from-field';
+
+    /**
+     * Diverges from its backing field on purpose.
+     *
+     * @return string
+     */
+    public function getTransformed(): string
+    {
+        return 'from-accessor';
+    }
+
+    /**
      * A purely virtual property: an accessor with no backing field.
      *
      * @return string
