@@ -38,7 +38,7 @@ XmlMapper is a PHP library that maps strongly-typed PHP objects (DTOs, value obj
 | Package  | `magicsunday/xmlmapper`                            |
 | PHP      | `^8.3`                                             |
 | Main API | `MagicSunday\XmlEncoder`                           |
-| Output   | XML string (`string`), or `false` on failure       |
+| Output   | XML string (`string`); `false` only if serialization itself fails |
 
 ## ❓ What is this?
 XmlMapper takes a PHP object implementing `MagicSunday\XmlSerializable` and renders it as XML, including nested objects, scalar and object collections, and custom types. Property values are routed to elements, attributes, raw text nodes or CDATA sections via a small set of annotations, and property names can be converted on the fly (e.g. snake_case to camelCase).
