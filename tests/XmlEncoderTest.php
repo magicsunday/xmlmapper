@@ -499,7 +499,7 @@ class XmlEncoderTest extends TestCase
         // "the outer survived and the inner returned nothing".
         self::assertStringContainsString(
             '<name>Jane Doe</name>',
-            $document->getElementsByTagName('author')->item(0)?->textContent ?? ''
+            $document->getElementsByTagName('author')->item(0)->textContent ?? ''
         );
     }
 }
