@@ -11,7 +11,7 @@ The public surface is small: an object implements the `MagicSunday\XmlSerializab
       -v /volume2/docker:/var/docker -e COMPOSER_AUTH buildbox \
       composer -d /var/docker/xmlmapper <script>
   ```
-- There is no Makefile, no Node tooling and no build step. The library ships source only.
+- There is no Makefile and no build step; the library ships source only. Node is the one non-PHP dependency: `ci:test:php:cpd` runs `npx jscpd`, and a `post-update-cmd` installs it via `npm install jscpd@^5.0.11`. A `ci:test` that dies at the cpd step outside the buildbox is a missing prerequisite, not a broken script.
 - `composer.lock` is **not** committed. CI therefore resolves dev dependencies fresh on every run, so a caret-ranged dev tool can pick up a newer version in CI than a local install has. A green local run is not by itself evidence that CI will be green.
 
 ## Build & tests
@@ -61,7 +61,8 @@ XmlSerializable (marker interface)
 
 ## Code style
 - PSR-12, `declare(strict_types=1)` in every file, `use function` for built-in functions and `use const` / a leading `\` for global constants.
-- **No `mixed`**, no `empty()`, no nested ternaries. Explicit comparisons (`=== ''`, `=== []`, `=== null`).
+- **No new `mixed`** where the type is knowable. Four signatures on the encoder's value path are irreducibly `mixed` and stay that way — `encodeCollection()`, `encodeObjectOrScalar()`, `encodeValue()`, `callCustomClosure()` receive arbitrary property values and arbitrary custom-closure returns. They are green at level max; do not "narrow" them.
+- No `empty()`, no nested ternaries. Explicit comparisons (`=== ''`, `=== []`, `=== null`).
 - **Never `@phpstan-ignore`.** Fix the type. `@phpstan-var` on a fixture is a narrowing annotation, not a suppression — and note `PhpDocExtractor` reads only `var`, `param` and `return`, so `@phpstan-var` is invisible to it (useful when a fixture must stay annotation-free at runtime).
 - Attributes go **after** the PHPDoc block. Class constants before properties before the constructor before methods.
 - Every method and every constant gets a real PHPDoc; `@param`/`@return`/`@throws` descriptions start capitalised. Never write a literal `@tag` in docblock prose — the parser treats it as a real annotation.
