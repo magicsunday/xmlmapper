@@ -34,7 +34,7 @@ XmlSerializable (marker interface)
 ```
 
 ### `src/`
-- **`XmlSerializable.php`** — Marker interface. Every object passed to `map()`, and every nested object that should be encoded recursively, must implement it. An object without it renders as an empty element rather than raising.
+- **`XmlSerializable.php`** — Marker interface. Every object passed to `map()`, and every nested object that should be encoded recursively, must implement it. A *nested* object without it renders as an empty element rather than raising; the root is type-hinted `XmlSerializable`, so a non-marker root is a `TypeError` at the call site, not a silent empty document.
 - **`XmlEncoder.php`** — The whole encoder (~600 lines, one class). `map()` builds a fresh `DOMDocument` per call and restores the previous one in a `finally`, so a nested `map()` from inside a custom-type closure does not corrupt the outer document. `encodeElement()` walks the extractor-reported properties; `encodeValue()` stringifies leaves.
 - **`XmlMapper/Annotation/`** — `XmlAttribute`, `XmlNodeValue`, `XmlCDataSection`. Resolved through `ReflectionProperty::getAttributes()` only — a docblock spelling is **not** read — and memoised per class and property.
 - **`XmlMapper/Converter/`** — `PropertyNameConverterInterface` plus the `CamelCasePropertyNameConverter` default. A converter is a documented extension point, so it may return a name that is not a valid XML name; that surfaces as a `DOMException`.
@@ -47,7 +47,7 @@ XmlSerializable (marker interface)
 `API.md` is the reference; `recipes/` covers markers, collections, custom name converters, type converters and manual instantiation. `README.md` is the entry point and must not outlive them.
 
 ## Key patterns
-- **The extractor decides what is encoded, not visibility.** `ReflectionExtractor` reports anything reachable through a public accessor, and the encoder then reads the **backing field**, not the accessor. A private field with a public getter is therefore serialized with its raw value even when the getter masks it. There is no per-property opt-out.
+- **The extractor decides what is *listed*; the backing field decides what is *encoded*.** `ReflectionExtractor` reports anything reachable through a public accessor, but `encodeElement()` skips every reported name `hasProperty()` does not know — a getter-only virtual property is silently dropped (pinned by `encodesWhatTheExtractorReportsAndReadsItAsAField`). For names that do have a field, the encoder reads the **field**, not the accessor, so a private field with a public getter is serialized with its raw value even when the getter masks it. There is no per-property opt-out.
 - **Type extractors drive two things**: collection detection *and* the `addType()` lookup key. Adding or removing one silently changes which converter fires.
 - **`addType()` keys on the declared type.** A fully qualified class or interface name is matched first, `object` remains the catch-all. The registered name is compared against the property's **own declared type** — the hierarchy is not walked and a collection is not unwrapped. A miss is silent: it yields an empty element, or, if the class implements `XmlSerializable`, the fully walked object.
 - **Unmappable values are dropped, not signalled.** `encodeValue()` returns `''` for anything neither scalar nor `Stringable`.
