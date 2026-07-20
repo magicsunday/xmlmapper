@@ -70,8 +70,9 @@ XmlSerializable (marker interface)
 - Comments, commit messages and GitHub prose are English.
 
 ## Commits & PRs
-- Commit subjects match `^GH-\d+: [A-ZÄÖÜ]` on issue-tied work and `^[A-ZÄÖÜ]` otherwise — a capitalised imperative either way. **No conventional-commit prefixes** (`feat:`, `fix:`, `chore:` …), no lowercase and no path-like starts (`src/XmlEncoder.php: …`). Branches for an issue are named exactly `GH-<N>`, where `<N>` is the issue number.
-    - The two patterns are deliberately kept separate. Folded into `^(GH-\d+: )?[A-ZÄÖÜ]` the rule stops enforcing the capital *after* the prefix: the optional group can be skipped, and the `G` of `GH-` then satisfies `[A-ZÄÖÜ]` on its own.
+- Commit subjects match `^GH-\d+: [A-ZÄÖÜ]` on issue-tied work and `^[A-ZÄÖÜ]` otherwise — a capitalised imperative either way. **No conventional-commit prefixes** (`feat:`, `fix:`, `chore:` …), no lowercase and no path-like starts (`src/XmlEncoder.php: …`).
+    - The two patterns are deliberately kept separate. Folded into `^(GH-\d+: )?[A-ZÄÖÜ]` the rule stops enforcing the capital *after* the prefix: the optional group can be skipped, and the `G` of `GH-` then satisfies `[A-ZÄÖÜ]` on its own — `GH-12: fix typo` would pass.
+- Branches for an issue are named exactly `GH-<N>`, where `<N>` is the issue number.
 - Never add a `Co-Authored-By:` trailer or any AI attribution.
 - One concern per commit; style-only fixes stay separate from behaviour changes.
 - Every issue gets a type label **and** a `priority:` label from the repo's own set.
