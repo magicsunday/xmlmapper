@@ -44,7 +44,7 @@ XmlSerializable (marker interface)
 - `TestCase.php::getXmlEncoder()` builds the **documented** extractor wiring. Changing it changes the configuration every test runs under — treat it as a shared harness, not a convenience.
 
 ### `docs/`
-`API.md` is the reference; `recipes/` covers markers, collections, custom name converters, type converters and manual instantiation. `README.md` is the entry point and must not outlive them.
+`API.md` is the reference; `recipes/` covers markers, collections, custom name converters, type converters and manual instantiation. `README.md` is the entry point and must not drift out of step with them — a change to the API or a recipe updates the README in the same commit.
 
 ## Key patterns
 - **The extractor decides what is *listed*; the backing field decides what is *encoded*.** `ReflectionExtractor` reports anything reachable through a public accessor, but `encodeElement()` skips every reported name `hasProperty()` does not know — a getter-only virtual property is silently dropped (pinned by `encodesWhatTheExtractorReportsAndReadsItAsAField`). For names that do have a field, the encoder reads the **field**, not the accessor, so a private field with a public getter is serialized with its raw value even when the getter masks it. There is no per-property opt-out.
@@ -60,7 +60,7 @@ XmlSerializable (marker interface)
 - Characterization tests that do not fail on pre-change code are legitimate, but say so in the docblock so a reader does not mistake them for regression guards.
 
 ## Code style
-- PSR-12, `declare(strict_types=1)` in every file, `use function` for built-in functions and `use const` / a leading `\` for global constants.
+- PER-CS 2.0 (`.php-cs-fixer.dist.php` enables `@PER-CS2x0` on top of `@PSR12`), `declare(strict_types=1)` in every file, `use function` for built-in functions and `use const` / a leading `\` for global constants.
 - **No new `mixed`** where the type is knowable. Four signatures on the encoder's value path are irreducibly `mixed` and stay that way — `encodeCollection()`, `encodeObjectOrScalar()`, `encodeValue()`, `callCustomClosure()` receive arbitrary property values and arbitrary custom-closure returns. They are green at level max; do not "narrow" them.
 - No `empty()`, no nested ternaries. Explicit comparisons (`=== ''`, `=== []`, `=== null`).
 - **Never `@phpstan-ignore`.** Fix the type. `@phpstan-var` on a fixture is a narrowing annotation, not a suppression — and note `PhpDocExtractor` reads only `var`, `param` and `return`, so `@phpstan-var` is invisible to it (useful when a fixture must stay annotation-free at runtime).
