@@ -24,9 +24,9 @@ use Doctrine\Inflector\InflectorFactory;
 class CamelCasePropertyNameConverter implements PropertyNameConverterInterface
 {
     /**
-     * @var Inflector
+     * The inflector that performs the camel-case conversion.
      */
-    private Inflector $inflector;
+    private readonly Inflector $inflector;
 
     /**
      * Constructor.
