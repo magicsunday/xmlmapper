@@ -60,8 +60,6 @@ class XmlEncoder
 
     /**
      * The document being built by the current map() call.
-     *
-     * @var DOMDocument
      */
     private DOMDocument $domDocument;
 
@@ -70,19 +68,7 @@ class XmlEncoder
      *
      * @var BuiltinType<TypeIdentifier::STRING>
      */
-    private BuiltinType $defaultType;
-
-    /**
-     * @var PropertyInfoExtractorInterface
-     */
-    private PropertyInfoExtractorInterface $extractor;
-
-    /**
-     * The property name converter instance.
-     *
-     * @var PropertyNameConverterInterface|null
-     */
-    protected ?PropertyNameConverterInterface $nameConverter;
+    private readonly BuiltinType $defaultType;
 
     /**
      * The custom types.
@@ -105,12 +91,13 @@ class XmlEncoder
      * @param PropertyNameConverterInterface|null $nameConverter A name converter instance
      */
     public function __construct(
-        PropertyInfoExtractorInterface $extractor,
-        ?PropertyNameConverterInterface $nameConverter = null,
+        private readonly PropertyInfoExtractorInterface $extractor,
+        /**
+         * The property name converter instance.
+         */
+        protected ?PropertyNameConverterInterface $nameConverter = null,
     ) {
-        $this->defaultType   = new BuiltinType(TypeIdentifier::STRING);
-        $this->extractor     = $extractor;
-        $this->nameConverter = $nameConverter;
+        $this->defaultType = new BuiltinType(TypeIdentifier::STRING);
     }
 
     /**
