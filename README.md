@@ -188,7 +188,13 @@ composer ci:test
 - Static analysis (`phpstan`, max level)
 - Refactoring dry-run (`rector --dry-run`)
 - Coding standards dry-run (`php-cs-fixer --dry-run`)
+- Architecture layers (`deptrac`, plus unassigned-class and layer-cycle checks)
+- Tool configs against the shared coding-standard templates (`check-consumer-config.php`)
 - Copy-paste detection (`jscpd`)
+
+The tool configurations import the shared rulesets of
+[`magicsunday/coding-standard`](https://github.com/magicsunday/coding-standard), which also
+delivers the whole QA toolchain as a single dev dependency.
 
 ## 🤝 Contributing
 

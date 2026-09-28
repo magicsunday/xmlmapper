@@ -15,12 +15,15 @@ The public surface is small: an object implements the `MagicSunday\XmlSerializab
 - `composer.lock` is **not** committed. CI therefore resolves dev dependencies fresh on every run, so a caret-ranged dev tool can pick up a newer version in CI than a local install has. A green local run is not by itself evidence that CI will be green.
 
 ## Build & tests
-- **`composer ci:test` MUST pass before every commit.** It chains lint → unit → phpstan → rector → cgl → cpd.
-- Individual gates: `ci:test:php:lint`, `ci:test:php:unit`, `ci:test:php:phpstan`, `ci:test:php:rector`, `ci:test:php:cgl`, `ci:test:php:cpd`.
+- **`composer ci:test` MUST pass before every commit.** It chains lint → unit → phpstan → rector → cgl → deptrac → templates → cpd.
+- Individual gates: `ci:test:php:lint`, `ci:test:php:unit`, `ci:test:php:phpstan`, `ci:test:php:rector`, `ci:test:php:cgl`, `ci:test:php:deptrac`, `ci:test:php:templates`, `ci:test:php:cpd`.
+- The QA toolchain (php-cs-fixer, PHPStan with its rule packs, Rector, phplint, PHPUnit, Deptrac) arrives through the single dev dependency `magicsunday/coding-standard` (`^3.0`). `.php-cs-fixer.dist.php`, `phpstan.neon` and `rector.php` import its shared rulesets (`php-cs-fixer/base.php`, `phpstan/base.neon`, `rector/base.php`) and only add this repository's header, paths and PHP floor. Change a shared rule in that repository, not here.
+- `phpunit.xml`, `.phplint.yml`, `.jscpd.json`, `.editorconfig` and `.gitattributes` are copies of the shared templates; `ci:test:php:templates` (`check-consumer-config.php .`) fails when a copy drops a strict flag or drifts from the canon.
+- `ci:test:php:deptrac` runs `deptrac analyse`, `deptrac debug:unassigned` (fails while a `src/` class is in no layer) and the layer-cycle check over the graphviz output. `deptrac.yaml` imports the shared layer ruleset and defines this package's own layers: `Encoder` (`XmlEncoder`), `Marker` (`XmlSerializable`), `Annotation` and `Converter` (`src/XmlMapper/<Area>/`). The three leaves depend on no other layer; only the encoder wires them. A new class needs a layer, or the unassigned check reds.
 - Single test: `composer ci:test:php:unit -- --filter <TestName>`.
 - Auto-fix: `composer ci:cgl` (PHP-CS-Fixer), `composer ci:rector`. Run them until stable — a fix can create new work for the other.
 - Coverage: `composer ci:test:php:unit:coverage`.
-- PHPStan runs at **level max** with strict-rules over `src/` **and** `tests/`. Test code is held to the same bar as production code; a fixture that only satisfies the analyser is a smell.
+- PHPStan runs at **level max** with strict-rules and checked exceptions (every thrown checked exception needs a `@throws`, and a stale one is reported) over `src/` **and** `tests/`. Test code is held to the same bar as production code; a fixture that only satisfies the analyser is a smell.
 - The GitHub build job invokes the granular `ci:test:php:*` steps individually on a `8.3 / 8.4 / 8.5` matrix — it does **not** call the `ci:test` aggregate. A new gate wired only into the aggregate runs locally but never in CI.
 
 ## Architecture
@@ -60,7 +63,7 @@ XmlSerializable (marker interface)
 - Characterization tests that do not fail on pre-change code are legitimate, but say so in the docblock so a reader does not mistake them for regression guards.
 
 ## Code style
-- PER-CS 2.0 (`.php-cs-fixer.dist.php` enables `@PER-CS2x0` on top of `@PSR12`), `declare(strict_types=1)` in every file, `use function` for built-in functions and `use const` / a leading `\` for global constants.
+- PER-CS 2.0 (the shared php-cs-fixer ruleset imported by `.php-cs-fixer.dist.php` enables `@PER-CS2x0` and `@Symfony`), `declare(strict_types=1)` in every file, `use function` for built-in functions and `use const` / a leading `\` for global constants.
 - **No new `mixed`** where the type is knowable. Four signatures on the encoder's value path are irreducibly `mixed` and stay that way — `encodeCollection()`, `encodeObjectOrScalar()`, `encodeValue()`, `callCustomClosure()` receive arbitrary property values and arbitrary custom-closure returns. They are green at level max; do not "narrow" them.
 - No `empty()`, no nested ternaries. Explicit comparisons (`=== ''`, `=== []`, `=== null`).
 - **Never `@phpstan-ignore`.** Fix the type. `@phpstan-var` on a fixture is a narrowing annotation, not a suppression — and note `PhpDocExtractor` reads only `var`, `param` and `return`, so `@phpstan-var` is invisible to it (useful when a fixture must stay annotation-free at runtime).
