@@ -1,0 +1,61 @@
+# Deptrac configuration.
+#
+# The canonical layer definitions and the allowed-dependency ruleset are imported
+# from magicsunday/coding-standard (^3.0: one strict, acyclic order
+# Support < Enum < Model, Configuration < Contract < Repository, Adapter, Service
+# < Facade < Module); this file declares the paths to analyse and this library's
+# own layers. The import path follows this repository's `.build/vendor` layout.
+#
+# `composer ci:test:php:deptrac` runs `deptrac analyse`, then
+# `deptrac debug:unassigned` (fails while a class is in no layer), and finally
+# writes the layer graph with `--formatter=graphviz-dot` and checks it with
+# `check-deptrac-cycles.php` (fails on any layer cycle). Dependencies on classes
+# outside every layer (Symfony, Doctrine, PHP built-ins) are reported as
+# "uncovered" but do not fail the run; do not enable `--fail-on-uncovered`
+# wholesale, since every external dependency is uncovered.
+imports:
+    - .build/vendor/magicsunday/coding-standard/deptrac/layers.yaml
+
+deptrac:
+    paths:
+        - src
+
+    # Package-local layers. None of the classes sits in a namespace segment the shared
+    # layers collect, so each area gets its own layer: the encoder entry class, the
+    # XmlSerializable marker interface, and one per src/XmlMapper/<Area> namespace.
+    layers:
+        -
+            name: Encoder
+            collectors:
+                -
+                    type: classNameRegex
+                    value: '#^MagicSunday\\XmlEncoder$#'
+        -
+            name: Marker
+            collectors:
+                -
+                    type: classNameRegex
+                    value: '#^MagicSunday\\XmlSerializable$#'
+        -
+            name: Annotation
+            collectors:
+                -
+                    type: directory
+                    value: 'src/XmlMapper/Annotation/.*'
+        -
+            name: Converter
+            collectors:
+                -
+                    type: directory
+                    value: 'src/XmlMapper/Converter/.*'
+
+    # Allow-lists: the marker, the annotations and the name converters are leaves that
+    # depend on no other layer of this package; the encoder wires all of them.
+    ruleset:
+        Marker: ~
+        Annotation: ~
+        Converter: ~
+        Encoder:
+            - Annotation
+            - Converter
+            - Marker
