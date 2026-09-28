@@ -22,15 +22,8 @@
         "doctrine/inflector": "^2.0"
     },
     "require-dev": {
-        "friendsofphp/php-cs-fixer": "^3.65",
-        "overtrue/phplint": "^9.0",
-        "phpdocumentor/reflection-docblock": "^5.0 || ^6.0",
-        "phpstan/phpstan": "^2.0",
-        "phpstan/phpstan-deprecation-rules": "^2.0",
-        "phpstan/phpstan-phpunit": "^2.0",
-        "phpstan/phpstan-strict-rules": "^2.0",
-        "phpunit/phpunit": "^12.0 || ^13.0",
-        "rector/rector": "^2.0"
+        "magicsunday/coding-standard": "^3.0",
+        "phpdocumentor/reflection-docblock": "^5.0 || ^6.0"
     },
     "suggest": {
         "phpdocumentor/reflection-docblock": "In order to use the PhpDocExtractor this library is required too."
@@ -72,6 +65,16 @@
         "ci:test:php:rector": [
             "@ci:rector --dry-run"
         ],
+        "ci:test:php:deptrac": [
+            "deptrac analyse --no-progress",
+            "deptrac debug:unassigned",
+            "@php -r \"is_dir('.build') || mkdir('.build', 0777, true);\"",
+            "deptrac analyse --no-progress --formatter=graphviz-dot --output=.build/deptrac-layers.dot",
+            "check-deptrac-cycles.php .build/deptrac-layers.dot"
+        ],
+        "ci:test:php:templates": [
+            "check-consumer-config.php ."
+        ],
         "ci:test:php:cpd": [
             "npx jscpd --config .jscpd.json --skip-comments --no-tips"
         ],
@@ -87,6 +90,8 @@
             "@ci:test:php:phpstan",
             "@ci:test:php:rector",
             "@ci:test:php:cgl",
+            "@ci:test:php:deptrac",
+            "@ci:test:php:templates",
             "@ci:test:php:cpd"
         ],
         "post-update-cmd": [
