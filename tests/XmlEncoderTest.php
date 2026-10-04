@@ -14,12 +14,17 @@ namespace MagicSunday\Test;
 use DOMDocument;
 use DOMElement;
 use DOMException;
+use Exception;
+use LogicException;
 use MagicSunday\Test\Fixture\Author;
 use MagicSunday\Test\Fixture\BodyHost;
 use MagicSunday\Test\Fixture\Book;
 use MagicSunday\Test\Fixture\Chapter;
 use MagicSunday\Test\Fixture\Comment;
 use MagicSunday\Test\Fixture\CustomTypeHost;
+use MagicSunday\Test\Fixture\CycleAfterNestedMapHost;
+use MagicSunday\Test\Fixture\CyclicCollectionNode;
+use MagicSunday\Test\Fixture\CyclicNode;
 use MagicSunday\Test\Fixture\EscapeCDataHost;
 use MagicSunday\Test\Fixture\EscapeHost;
 use MagicSunday\Test\Fixture\EscapeMarkerHost;
@@ -27,6 +32,7 @@ use MagicSunday\Test\Fixture\IgnoreHost;
 use MagicSunday\Test\Fixture\IgnoreRedeclaredHost;
 use MagicSunday\Test\Fixture\IgnoreRepeatedHost;
 use MagicSunday\Test\Fixture\InterfaceMoneyHost;
+use MagicSunday\Test\Fixture\IteratorCollectionHost;
 use MagicSunday\Test\Fixture\Money;
 use MagicSunday\Test\Fixture\MoneyBag;
 use MagicSunday\Test\Fixture\MoneyHost;
@@ -35,14 +41,17 @@ use MagicSunday\Test\Fixture\NativeCData;
 use MagicSunday\Test\Fixture\NativeMarkers;
 use MagicSunday\Test\Fixture\NativeWithForeignAttribute;
 use MagicSunday\Test\Fixture\NativeWithForeignDocblock;
+use MagicSunday\Test\Fixture\NestedMapStateHost;
 use MagicSunday\Test\Fixture\Person;
 use MagicSunday\Test\Fixture\PlainArrayHost;
 use MagicSunday\Test\Fixture\PlainBody;
 use MagicSunday\Test\Fixture\Price;
 use MagicSunday\Test\Fixture\SerializableMoney;
 use MagicSunday\Test\Fixture\SerializableMoneyBag;
+use MagicSunday\Test\Fixture\SharedChildHost;
 use MagicSunday\Test\Fixture\SpecialMoney;
 use MagicSunday\Test\Fixture\SpecialMoneyHost;
+use MagicSunday\Test\Fixture\ThrowingKeyIterator;
 use MagicSunday\Test\Fixture\UninitializedHost;
 use MagicSunday\Test\Fixture\UnionObjectHost;
 use MagicSunday\Test\Fixture\UnionProperty;
@@ -55,6 +64,7 @@ use MagicSunday\XmlMapper\Annotation\XmlIgnore;
 use MagicSunday\XmlMapper\Annotation\XmlNodeValue;
 use MagicSunday\XmlMapper\Converter\CamelCasePropertyNameConverter;
 use MagicSunday\XmlMapper\Converter\PropertyNameConverterInterface;
+use MagicSunday\XmlMapper\Exception\CircularReferenceException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\Attributes\UsesClass;
@@ -75,6 +85,7 @@ use Symfony\Component\PropertyInfo\PropertyInfoExtractor;
 #[UsesClass(XmlNodeValue::class)]
 #[UsesClass(XmlCDataSection::class)]
 #[UsesClass(XmlIgnore::class)]
+#[UsesClass(CircularReferenceException::class)]
 class XmlEncoderTest extends TestCase
 {
     /**
@@ -639,6 +650,301 @@ class XmlEncoderTest extends TestCase
 
         self::assertInstanceOf(DOMElement::class, $author);
         self::assertStringContainsString('<name>Jane Doe</name>', $author->textContent);
+    }
+
+    /**
+     * An object that reaches itself through one of its own properties never
+     * finishes encoding. The encoder has to stop with a library exception that
+     * names the property path closing the cycle, not run into the execution time
+     * limit.
+     */
+    #[Test]
+    public function throwsOnAnObjectThatReferencesItself(): void
+    {
+        $node       = new CyclicNode();
+        $node->peer = $node;
+
+        $this->expectException(CircularReferenceException::class);
+        $this->expectExceptionMessageMatches('/' . preg_quote('"CyclicNode.peer"', '/') . '/');
+
+        $this->getXmlEncoder()->map($node);
+    }
+
+    /**
+     * Two objects that point at each other close the cycle one object later, and
+     * the path names both steps.
+     */
+    #[Test]
+    public function throwsOnTwoObjectsThatReferenceEachOther(): void
+    {
+        $first        = new CyclicNode();
+        $second       = new CyclicNode();
+        $first->peer  = $second;
+        $second->peer = $first;
+
+        $this->expectException(CircularReferenceException::class);
+        $this->expectExceptionMessageMatches('/' . preg_quote('"CyclicNode.peer.peer"', '/') . '/');
+
+        $this->getXmlEncoder()->map($first);
+    }
+
+    /**
+     * A cycle closed through an entry of a collection is found as well, and the
+     * path carries the entry index.
+     */
+    #[Test]
+    public function throwsOnACycleThroughACollectionEntry(): void
+    {
+        $node             = new CyclicCollectionNode();
+        $node->children[] = $node;
+
+        $this->expectException(CircularReferenceException::class);
+        $this->expectExceptionMessageMatches('/' . preg_quote('"CyclicCollectionNode.children[0]"', '/') . '/');
+
+        $this->getXmlEncoder()->map($node);
+    }
+
+    /**
+     * The same instance reached on several branches is not a cycle. Only an
+     * object that is still being encoded further up the same path counts, so a
+     * seen-before set instead of the active path would reject this valid graph.
+     */
+    #[Test]
+    public function encodesASharedChildThatIsNoCycle(): void
+    {
+        $author       = new Author();
+        $host         = new SharedChildHost();
+        $host->first  = $author;
+        $host->second = $author;
+        $host->others = [$author, $author];
+
+        self::assertXmlStringEqualsXmlString(
+            <<<'XML'
+                <?xml version="1.0" encoding="UTF-8"?>
+                <sharedChildHost>
+                    <first><name>Jane Doe</name></first>
+                    <second><name>Jane Doe</name></second>
+                    <others><name>Jane Doe</name></others>
+                    <others><name>Jane Doe</name></others>
+                </sharedChildHost>
+                XML,
+            (string) $this->getXmlEncoder()->map($host)
+        );
+    }
+
+    /**
+     * A cycle that runs through a type converter calling map() again is found as
+     * well. The nested call is part of the outer encode, so it keeps the set of
+     * objects being encoded and extends the path with its own root. A nested call
+     * that started with an empty set would never meet the object it was reached
+     * from, and the recursion would not end.
+     */
+    #[Test]
+    public function throwsOnACycleThatRunsThroughANestedMapCall(): void
+    {
+        $encoder = $this->getXmlEncoder();
+
+        $encoder->addType(
+            CyclicNode::class,
+            static fn (string $name, CyclicNode $value): string => (string) $encoder->map($value)
+        );
+
+        $first        = new CyclicNode();
+        $second       = new CyclicNode();
+        $first->peer  = $second;
+        $second->peer = $first;
+
+        $this->expectException(CircularReferenceException::class);
+        $this->expectExceptionMessageMatches('/' . preg_quote('"CyclicNode.peer.CyclicNode.peer.CyclicNode"', '/') . '/');
+
+        $encoder->map($first);
+    }
+
+    /**
+     * An object that is encoded through nested map() calls on several branches
+     * is no cycle either, and every branch is encoded in full.
+     */
+    #[Test]
+    public function encodesASharedChildThroughNestedMapCalls(): void
+    {
+        $encoder = $this->getXmlEncoder();
+
+        $encoder->addType(
+            Author::class,
+            static fn (string $name, Author $value): string => (string) $encoder->map($value)
+        );
+
+        $author       = new Author();
+        $host         = new SharedChildHost();
+        $host->first  = $author;
+        $host->second = $author;
+        $host->others = [$author, $author];
+
+        self::assertSame(
+            4,
+            substr_count((string) $encoder->map($host), 'Jane Doe'),
+            'The same author has to be encoded in full for first, second and both list entries.'
+        );
+    }
+
+    /**
+     * A nested call that fails and is caught inside the converter hands the outer
+     * state back as it was. Whatever the failed call left on the set and the path
+     * would otherwise show up in the path of the next cycle the outer run meets.
+     */
+    #[Test]
+    public function keepsTheOuterStateWhenANestedMapCallThrows(): void
+    {
+        $encoder = $this->getXmlEncoder();
+
+        $cyclic       = new CyclicNode();
+        $cyclic->peer = $cyclic;
+
+        $encoder->addType(
+            Author::class,
+            static function (string $name, Author $value) use ($encoder, $cyclic): string {
+                try {
+                    return (string) $encoder->map($cyclic);
+                } catch (CircularReferenceException) {
+                    return 'caught';
+                }
+            }
+        );
+
+        $host         = new CycleAfterNestedMapHost();
+        $host->author = new Author();
+        $host->self   = $host;
+
+        $this->expectException(CircularReferenceException::class);
+        $this->expectExceptionMessageMatches('/' . preg_quote('"CycleAfterNestedMapHost.self"', '/') . '/');
+
+        $encoder->map($host);
+    }
+
+    /**
+     * A collection held as an iterator is walked without asking it for its keys.
+     * The recipes allow such collections, and the path bookkeeping must not add a
+     * call to them that they were never subject to.
+     */
+    #[Test]
+    public function encodesAnIteratorCollectionWithoutReadingItsKeys(): void
+    {
+        $host          = new IteratorCollectionHost();
+        $host->authors = new ThrowingKeyIterator([new Author(), new Author()]);
+
+        self::assertXmlStringEqualsXmlString(
+            <<<'XML'
+                <?xml version="1.0" encoding="UTF-8"?>
+                <iteratorCollectionHost>
+                    <authors><name>Jane Doe</name></authors>
+                    <authors><name>Jane Doe</name></authors>
+                </iteratorCollectionHost>
+                XML,
+            (string) $this->getXmlEncoder()->map($host)
+        );
+    }
+
+    /**
+     * A collection leaves nothing of its entry positions on the path once it is
+     * encoded. The cycle that comes after it is reported at its own short path,
+     * where a position left behind would show up in the message.
+     */
+    #[Test]
+    public function leavesNoCollectionPositionOnThePathAfterTheCollection(): void
+    {
+        $node           = new CyclicCollectionNode();
+        $node->children = [new CyclicCollectionNode(), new CyclicCollectionNode()];
+        $node->parent   = $node;
+
+        $this->expectException(CircularReferenceException::class);
+        $this->expectExceptionMessageMatches('/' . preg_quote('"CyclicCollectionNode.parent"', '/') . '/');
+
+        $this->getXmlEncoder()->map($node);
+    }
+
+    /**
+     * A nested map() call that fails and is caught inside the converter hands the
+     * set of objects being encoded back as well. The node it started from has to
+     * be encodable again afterwards, as a plain property of the outer run. If the
+     * failed call left it behind as still being encoded, the outer run would report
+     * a cycle that does not exist.
+     */
+    #[Test]
+    public function encodesTheNodeAgainAfterAFailedNestedMapCall(): void
+    {
+        $encoder = $this->getXmlEncoder();
+
+        $leaf         = new CyclicNode();
+        $parent       = new CyclicNode();
+        $parent->peer = $leaf;
+
+        $failures = 0;
+
+        $encoder->addType(
+            CyclicNode::class,
+            static function (string $name, ?CyclicNode $value) use ($leaf, &$failures): ?CyclicNode {
+                if (($value === $leaf) && (++$failures === 1)) {
+                    throw new LogicException('The first conversion of the leaf fails.');
+                }
+
+                return $value;
+            }
+        );
+
+        $encoder->addType(
+            Author::class,
+            static function (string $name, Author $value) use ($encoder, $parent): string {
+                try {
+                    return (string) $encoder->map($parent);
+                } catch (Exception) {
+                    return 'caught';
+                }
+            }
+        );
+
+        $host         = new NestedMapStateHost();
+        $host->author = new Author();
+        $host->shared = $parent;
+
+        self::assertXmlStringEqualsXmlString(
+            <<<'XML'
+                <?xml version="1.0" encoding="UTF-8"?>
+                <nestedMapStateHost>
+                    <author>caught</author>
+                    <shared>
+                        <peer><label>x</label></peer>
+                        <label>x</label>
+                    </shared>
+                </nestedMapStateHost>
+                XML,
+            (string) $encoder->map($host)
+        );
+    }
+
+    /**
+     * A nested map() call from a type converter extends the path of the outer run
+     * and hands it back as it was. The cycle that comes after the converter ran
+     * is therefore still found at its own, short path. A nested call that left
+     * its own steps on the path would make the path in the message longer.
+     */
+    #[Test]
+    public function keepsTheOuterPathWhenANestedMapCallRuns(): void
+    {
+        $encoder = $this->getXmlEncoder();
+
+        $encoder->addType(
+            Author::class,
+            static fn (string $name, Author $value): string => (string) $encoder->map(new Author())
+        );
+
+        $host         = new CycleAfterNestedMapHost();
+        $host->author = new Author();
+        $host->self   = $host;
+
+        $this->expectException(CircularReferenceException::class);
+        $this->expectExceptionMessageMatches('/' . preg_quote('"CycleAfterNestedMapHost.self"', '/') . '/');
+
+        $encoder->map($host);
     }
 
     /**

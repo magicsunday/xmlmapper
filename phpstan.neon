@@ -16,3 +16,9 @@ parameters:
 
     excludePaths:
         - %currentWorkingDirectory%/.build/
+
+    ignoreErrors:
+        # Checked-exception contracts are enforced on src/, where callers depend on them.
+        -
+            identifier: missingType.checkedException
+            path: %currentWorkingDirectory%/tests/*

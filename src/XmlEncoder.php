@@ -20,6 +20,7 @@ use MagicSunday\XmlMapper\Annotation\XmlCDataSection;
 use MagicSunday\XmlMapper\Annotation\XmlIgnore;
 use MagicSunday\XmlMapper\Annotation\XmlNodeValue;
 use MagicSunday\XmlMapper\Converter\PropertyNameConverterInterface;
+use MagicSunday\XmlMapper\Exception\CircularReferenceException;
 use ReflectionClass;
 use ReflectionException;
 use ReflectionObject;
@@ -35,9 +36,13 @@ use Symfony\Component\TypeInfo\TypeIdentifier;
 
 use function array_fill_keys;
 use function array_key_exists;
+use function array_pop;
+use function implode;
 use function is_bool;
 use function is_iterable;
 use function is_scalar;
+use function spl_object_id;
+use function str_replace;
 
 /**
  * XmlEncoder.
@@ -64,6 +69,22 @@ class XmlEncoder
      * The document being built by the current map() call.
      */
     private DOMDocument $domDocument;
+
+    /**
+     * The objects that are being encoded on the current path, keyed by object id.
+     * An object that is already in here and is reached again closes a cycle.
+     *
+     * @var array<int, true>
+     */
+    private array $activeObjects = [];
+
+    /**
+     * The property path from the root object to the property being encoded, one
+     * entry per step. It is only used to name the path in an exception.
+     *
+     * @var list<string>
+     */
+    private array $propertyPath = [];
 
     /**
      * The default type instance.
@@ -127,6 +148,7 @@ class XmlEncoder
      * @return string|false the XML, or false if an error occurred
      *
      * @throws DOMException
+     * @throws CircularReferenceException When an object is reached again through its own properties
      */
     public function map(XmlSerializable $instance): string|false
     {
@@ -137,14 +159,23 @@ class XmlEncoder
         // The previous document is restored afterwards so a nested call — a
         // custom-type closure mapping a sub-object through the same encoder —
         // cannot pull the document out from under the outer run.
-        $previousDocument = $this->domDocument ?? null;
+        //
+        // A nested call is part of the outer encode, though. It keeps the set of
+        // objects being encoded and extends the property path instead of starting
+        // fresh, because a cycle that runs through a closure calling map() again
+        // has to be found too. Whatever the nested call adds or leaves behind,
+        // after an exception it caught for one, is handed back as it was.
+        $previousDocument      = $this->domDocument ?? null;
+        $previousActiveObjects = $this->activeObjects;
+        $previousPropertyPath  = $this->propertyPath;
 
         try {
             $this->domDocument                = new DOMDocument('1.0', 'UTF-8');
             $this->domDocument->xmlStandalone = false;
             $this->domDocument->formatOutput  = true;
 
-            $rootElementName = $this->getClassShortName($instance);
+            $rootElementName      = $this->getClassShortName($instance);
+            $this->propertyPath[] = $rootElementName;
 
             if ($this->nameConverter instanceof PropertyNameConverterInterface) {
                 $rootElementName = $this->nameConverter->convert($rootElementName);
@@ -159,6 +190,9 @@ class XmlEncoder
 
             return $this->domDocument->saveXML();
         } finally {
+            $this->activeObjects = $previousActiveObjects;
+            $this->propertyPath  = $previousPropertyPath;
+
             if ($previousDocument instanceof DOMDocument) {
                 $this->domDocument = $previousDocument;
             } else {
@@ -175,6 +209,7 @@ class XmlEncoder
      * @param XmlSerializable $instance
      *
      * @throws DOMException
+     * @throws CircularReferenceException When an object is reached again through its own properties
      */
     private function encodeElement(DOMElement $domElement, XmlSerializable $instance): void
     {
@@ -209,11 +244,17 @@ class XmlEncoder
             $customTypeKey = $this->getCustomTypeKey($propertyType);
 
             if ($customTypeKey !== null) {
+                // The property is on the path while its converter runs, so a nested
+                // map() call from the converter reads as a step below this property.
+                $this->propertyPath[] = $propertyName;
+
                 $propertyValue = $this->callCustomClosure(
                     $propertyName,
                     $propertyValue,
                     $customTypeKey
                 );
+
+                array_pop($this->propertyPath);
             }
 
             // Ignore null values
@@ -261,23 +302,24 @@ class XmlEncoder
                 continue;
             }
 
-            // Process collections
+            $this->propertyPath[] = $propertyName;
+
+            // Process collections, then any other data
             if ($this->isCollection($propertyType)) {
                 $this->encodeCollection(
                     $domElement,
                     $xmlPropertyName,
                     $propertyValue
                 );
-
-                continue;
+            } else {
+                $this->encodeObjectOrScalar(
+                    $domElement,
+                    $xmlPropertyName,
+                    $propertyValue
+                );
             }
 
-            // Process any other data
-            $this->encodeObjectOrScalar(
-                $domElement,
-                $xmlPropertyName,
-                $propertyValue
-            );
+            array_pop($this->propertyPath);
         }
     }
 
@@ -445,6 +487,7 @@ class XmlEncoder
      * @param mixed  $values The collection values to encode to the XML
      *
      * @throws DOMException
+     * @throws CircularReferenceException When an object is reached again through its own properties
      */
     private function encodeCollection(DOMElement $parent, string $name, mixed $values): void
     {
@@ -452,9 +495,19 @@ class XmlEncoder
             return;
         }
 
-        // Process all entries in the collection
+        // Process all entries in the collection. The position is counted here
+        // rather than read from the keys, because asking an iterator for its key
+        // is a call its entries were never subject to before.
+        $position = 0;
+
         foreach ($values as $value) {
+            $this->propertyPath[] = '[' . $position . ']';
+
             $this->encodeObjectOrScalar($parent, $name, $value);
+
+            array_pop($this->propertyPath);
+
+            ++$position;
         }
     }
 
@@ -468,6 +521,7 @@ class XmlEncoder
      * @param mixed  $value The XML node value
      *
      * @throws DOMException
+     * @throws CircularReferenceException When an object is reached again through its own properties
      */
     private function encodeObjectOrScalar(DOMElement $parent, string $name, mixed $value): void
     {
@@ -502,19 +556,48 @@ class XmlEncoder
      * @param XmlSerializable $value  The XML node value
      *
      * @throws DOMException
+     * @throws CircularReferenceException When the object is already being encoded further up the same path
      */
     private function encodeObject(?DOMElement $parent, string $name, XmlSerializable $value): void
     {
+        $objectId = spl_object_id($value);
+
+        // Only an object that is still being encoded on the way down to here is a
+        // cycle. The same instance on another branch has finished by the time it
+        // is reached again, so it is no longer in the set.
+        if (isset($this->activeObjects[$objectId])) {
+            throw CircularReferenceException::atPath(
+                $this->describePropertyPath(),
+                $value::class
+            );
+        }
+
+        $this->activeObjects[$objectId] = true;
+
         $node = $this->domDocument->createElement($name);
 
         // Encode object and its properties
         $this->encodeElement($node, $value);
+
+        unset($this->activeObjects[$objectId]);
 
         if ($parent instanceof DOMElement) {
             $parent->appendChild($node);
         } else {
             $this->domDocument->appendChild($node);
         }
+    }
+
+    /**
+     * Returns the property path that leads to the object being reached, written
+     * as "Root.property.property" with the index of a collection entry in
+     * brackets after its property.
+     *
+     * @return string
+     */
+    private function describePropertyPath(): string
+    {
+        return str_replace('.[', '[', implode('.', $this->propertyPath));
     }
 
     /**
