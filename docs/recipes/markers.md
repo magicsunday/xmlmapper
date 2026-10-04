@@ -98,6 +98,11 @@ Without the marker the private field would be encoded, because the list extracto
 reports it through its public getter. See
 [Manual instantiation](manual-instantiation.md) for how the extractor decides.
 
+The marker belongs to the property declaration of the concrete class. A subclass
+that redeclares an ignored property has to repeat `#[XmlIgnore]` on its own
+declaration, otherwise the redeclared property is encoded again. The other markers
+behave the same way.
+
 ## Notes
 
 - Apart from `XmlIgnore`, a property may carry at most one of these markers; the
