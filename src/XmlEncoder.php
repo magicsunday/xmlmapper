@@ -233,6 +233,12 @@ class XmlEncoder
 
             $property = $reflection->getProperty($propertyName);
 
+            // A static property is state of the class, shared by every instance,
+            // and not state of the object being encoded.
+            if ($property->isStatic()) {
+                continue;
+            }
+
             // A typed property that was never assigned raises a native Error on
             // read. That is outside every guarantee map() documents, and an
             // unset optional property is an ordinary DTO shape, so treat it the
