@@ -157,7 +157,7 @@ $encoder->addType('bool', static fn (string $name, mixed $value): string => $val
 * [API reference](docs/API.md)
 * Recipes
   * [Manual instantiation](docs/recipes/manual-instantiation.md) — wiring the Symfony extractor and name converter
-  * [Markers: attributes, node values and CDATA](docs/recipes/markers.md) — native attribute syntax
+  * [Markers: attributes, node values, CDATA and ignored properties](docs/recipes/markers.md) — native attribute syntax
   * [Custom types](docs/recipes/type-converters.md) — transforming values with `addType()`
   * [Custom name converter](docs/recipes/custom-name-converter.md) — element naming
   * [Collections](docs/recipes/collections.md) — scalar, object, nullable and union-typed collections

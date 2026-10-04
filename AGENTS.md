@@ -43,7 +43,7 @@ XmlSerializable (marker interface)
 - **`XmlMapper/Converter/`** — `PropertyNameConverterInterface` plus the `CamelCasePropertyNameConverter` default. A converter is a documented extension point, so it may return a name that is not a valid XML name; that surfaces as a `DOMException`.
 
 ### `tests/`
-- `XmlEncoderTest.php` is a characterization suite over the encoder; `tests/Fixture/` holds ~33 small fixtures, each pinning one behaviour.
+- `XmlEncoderTest.php` is a characterization suite over the encoder; `tests/Fixture/` holds small fixtures, each pinning one behaviour.
 - `TestCase.php::getXmlEncoder()` builds the **documented** extractor wiring. Changing it changes the configuration every test runs under — treat it as a shared harness, not a convenience.
 
 ### `docs/`
