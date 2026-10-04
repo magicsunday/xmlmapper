@@ -48,14 +48,23 @@ deptrac:
                 -
                     type: directory
                     value: 'src/XmlMapper/Converter/.*'
+        -
+            name: Exception
+            collectors:
+                -
+                    type: directory
+                    value: 'src/XmlMapper/Exception/.*'
 
-    # Allow-lists: the marker, the annotations and the name converters are leaves that
-    # depend on no other layer of this package; the encoder wires all of them.
+    # Allow-lists: the marker, the annotations, the name converters and the exceptions
+    # are leaves that depend on no other layer of this package; the encoder wires all
+    # of them.
     ruleset:
         Marker: ~
         Annotation: ~
         Converter: ~
+        Exception: ~
         Encoder:
             - Annotation
             - Converter
+            - Exception
             - Marker

@@ -19,11 +19,11 @@ The public surface is small: an object implements the `MagicSunday\XmlSerializab
 - Individual gates: `ci:test:php:lint`, `ci:test:php:unit`, `ci:test:php:phpstan`, `ci:test:php:rector`, `ci:test:php:cgl`, `ci:test:php:deptrac`, `ci:test:php:templates`, `ci:test:php:cpd`.
 - The QA toolchain (php-cs-fixer, PHPStan with its rule packs, Rector, phplint, PHPUnit, Deptrac) arrives through the single dev dependency `magicsunday/coding-standard` (`^3.0`). `.php-cs-fixer.dist.php`, `phpstan.neon` and `rector.php` import its shared rulesets (`php-cs-fixer/base.php`, `phpstan/base.neon`, `rector/base.php`) and only add this repository's header, paths and PHP floor. Change a shared rule in that repository, not here.
 - `phpunit.xml`, `.phplint.yml`, `.jscpd.json`, `.editorconfig` and `.gitattributes` are copies of the shared templates; `ci:test:php:templates` (`check-consumer-config.php .`) fails when a copy drops a strict flag or drifts from the canon.
-- `ci:test:php:deptrac` runs `deptrac analyse`, `deptrac debug:unassigned` (fails while a `src/` class is in no layer) and the layer-cycle check over the graphviz output. `deptrac.yaml` imports the shared layer ruleset and defines this package's own layers: `Encoder` (`XmlEncoder`), `Marker` (`XmlSerializable`), `Annotation` and `Converter` (`src/XmlMapper/<Area>/`). The three leaves depend on no other layer; only the encoder wires them. A new class needs a layer, or the unassigned check reds.
+- `ci:test:php:deptrac` runs `deptrac analyse`, `deptrac debug:unassigned` (fails while a `src/` class is in no layer) and the layer-cycle check over the graphviz output. `deptrac.yaml` imports the shared layer ruleset and defines this package's own layers: `Encoder` (`XmlEncoder`), `Marker` (`XmlSerializable`), `Annotation`, `Converter` and `Exception` (`src/XmlMapper/<Area>/`). Those and the marker are leaves that depend on no other layer; only the encoder wires them. A new class needs a layer, or the unassigned check reds.
 - Single test: `composer ci:test:php:unit -- --filter <TestName>`.
 - Auto-fix: `composer ci:cgl` (PHP-CS-Fixer), `composer ci:rector`. Run them until stable — a fix can create new work for the other.
 - Coverage: `composer ci:test:php:unit:coverage`.
-- PHPStan runs at **level max** with strict-rules and checked exceptions (every thrown checked exception needs a `@throws`, and a stale one is reported) over `src/` **and** `tests/`. Test code is held to the same bar as production code; a fixture that only satisfies the analyser is a smell.
+- PHPStan runs at **level max** with strict-rules over `src/` **and** `tests/`, and with checked exceptions (every thrown checked exception needs a `@throws`, and a stale one is reported). The checked-exception contract is enforced on `src/`, where callers depend on it, and `phpstan.neon` carries a scoped ignore of that one identifier for `tests/`. Test code is otherwise held to the same bar as production code; a fixture that only satisfies the analyser is a smell.
 - The GitHub build job invokes the granular `ci:test:php:*` steps individually on a `8.3 / 8.4 / 8.5` matrix — it does **not** call the `ci:test` aggregate. A new gate wired only into the aggregate runs locally but never in CI.
 
 ## Architecture
@@ -38,9 +38,10 @@ XmlSerializable (marker interface)
 
 ### `src/`
 - **`XmlSerializable.php`** — Marker interface. Every object passed to `map()`, and every nested object that should be encoded recursively, must implement it. A *nested* object without it renders as an empty element rather than raising; the root is type-hinted `XmlSerializable`, so a non-marker root is a `TypeError` at the call site, not a silent empty document.
-- **`XmlEncoder.php`** — The whole encoder (~600 lines, one class). `map()` builds a fresh `DOMDocument` per call and restores the previous one in a `finally`, so a nested `map()` from inside a custom-type closure does not corrupt the outer document. `encodeElement()` walks the extractor-reported properties; `encodeValue()` stringifies leaves.
+- **`XmlEncoder.php`** — The whole encoder, one class. `map()` builds a fresh `DOMDocument` per call and restores the previous one in a `finally`, so a nested `map()` from inside a custom-type closure does not corrupt the outer document. The same `finally` hands back the active-object set and the property path that detect a cycle, which a nested `map()` continues instead of starting fresh. `encodeElement()` walks the extractor-reported properties; `encodeValue()` stringifies leaves.
 - **`XmlMapper/Annotation/`** — `XmlAttribute`, `XmlNodeValue`, `XmlCDataSection`, `XmlIgnore`. Resolved through `ReflectionProperty::getAttributes()` only — a docblock spelling is **not** read — and memoised per class and property.
 - **`XmlMapper/Converter/`** — `PropertyNameConverterInterface` plus the `CamelCasePropertyNameConverter` default. A converter is a documented extension point, so it may return a name that is not a valid XML name; that surfaces as a `DOMException`.
+- **`XmlMapper/Exception/`** — `CircularReferenceException`, a `RuntimeException` that `map()` throws for a cyclic object graph. Its message names the property path that closes the cycle.
 
 ### `tests/`
 - `XmlEncoderTest.php` is a characterization suite over the encoder; `tests/Fixture/` holds small fixtures, each pinning one behaviour.
@@ -54,6 +55,7 @@ XmlSerializable (marker interface)
 - **Type extractors drive two things**: collection detection *and* the `addType()` lookup key. Adding or removing one silently changes which converter fires.
 - **`addType()` keys on the declared type.** A fully qualified class or interface name is matched first, `object` remains the catch-all. The registered name is compared against the property's **own declared type** — the hierarchy is not walked and a collection is not unwrapped. A miss is silent: it yields an empty element, or, if the class implements `XmlSerializable`, the fully walked object.
 - **Unmappable values are dropped, not signalled.** `encodeValue()` returns `''` for anything neither scalar nor `Stringable`.
+- **A cycle is detected on the active path, not on everything seen.** `encodeObject()` keeps the objects it is currently inside, keyed by object id, and throws when it meets one of them again. The same instance on another branch has finished by then and is encoded in full, so a seen-before set would reject a valid graph. A nested `map()` call keeps the set, because a cycle that runs through a closure calling `map()` again must be found too, and the entry position in the path is counted, not read from the keys, so an iterator is never asked for them.
 
 ## Testing rules
 - Write the failing test first, then the minimal fix — including for "obvious" changes.
