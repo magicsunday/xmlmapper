@@ -67,7 +67,7 @@ class IgnoreHost implements XmlSerializable
     public array $chapters = [];
 
     /**
-     * Constructor.
+     * Seeds the collection that the ignore marker has to keep out of the output.
      */
     public function __construct()
     {
