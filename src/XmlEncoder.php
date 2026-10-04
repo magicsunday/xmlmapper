@@ -38,9 +38,11 @@ use function array_fill_keys;
 use function array_key_exists;
 use function array_pop;
 use function implode;
+use function is_array;
 use function is_bool;
 use function is_iterable;
 use function is_scalar;
+use function method_exists;
 use function spl_object_id;
 use function str_replace;
 
@@ -239,6 +241,12 @@ class XmlEncoder
                 continue;
             }
 
+            // A write-only virtual property reports itself as initialized, yet
+            // reading it raises a native Error as well, so it is skipped too.
+            if ($this->isWriteOnly($property)) {
+                continue;
+            }
+
             $propertyValue = $property->getValue($instance);
             $propertyType  = $this->getType($className, $propertyName);
             $customTypeKey = $this->getCustomTypeKey($propertyType);
@@ -383,6 +391,32 @@ class XmlEncoder
     private function isCollection(Type $type): bool
     {
         return $this->getBaseType($type) instanceof CollectionType;
+    }
+
+    /**
+     * Returns TRUE if the property can only be written, which is a virtual
+     * property that has a set hook and no get hook.
+     *
+     * @param ReflectionProperty $property The property to check
+     *
+     * @return bool
+     */
+    private function isWriteOnly(ReflectionProperty $property): bool
+    {
+        // Neither property hooks nor the reflection of them exist below PHP 8.4,
+        // and no class can declare such a property there.
+        if (
+            !method_exists($property, 'isVirtual')
+            || !method_exists($property, 'getHooks')
+        ) {
+            return false;
+        }
+
+        $hooks = $property->getHooks();
+
+        return ($property->isVirtual() === true)
+            && is_array($hooks)
+            && !array_key_exists('get', $hooks);
     }
 
     /**
