@@ -59,6 +59,8 @@ use MagicSunday\Test\Fixture\UninitializedHost;
 use MagicSunday\Test\Fixture\UnionObjectHost;
 use MagicSunday\Test\Fixture\UnionProperty;
 use MagicSunday\Test\Fixture\UnmarkedNested;
+use MagicSunday\Test\Fixture\UnparseableStringable;
+use MagicSunday\Test\Fixture\UnparseableValueHost;
 use MagicSunday\Test\Fixture\VisibilityHost;
 use MagicSunday\XmlEncoder;
 use MagicSunday\XmlMapper\Annotation\XmlAttribute;
@@ -68,6 +70,7 @@ use MagicSunday\XmlMapper\Annotation\XmlNodeValue;
 use MagicSunday\XmlMapper\Converter\CamelCasePropertyNameConverter;
 use MagicSunday\XmlMapper\Converter\PropertyNameConverterInterface;
 use MagicSunday\XmlMapper\Exception\CircularReferenceException;
+use MagicSunday\XmlMapper\Exception\InvalidXmlValueException;
 use MagicSunday\XmlSerializable;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
@@ -75,6 +78,15 @@ use PHPUnit\Framework\Attributes\UsesClass;
 use Symfony\Component\PropertyInfo\Extractor\PhpDocExtractor;
 use Symfony\Component\PropertyInfo\Extractor\ReflectionExtractor;
 use Symfony\Component\PropertyInfo\PropertyInfoExtractor;
+
+use function array_diff;
+use function array_map;
+use function array_merge;
+use function bin2hex;
+use function chr;
+use function implode;
+use function preg_quote;
+use function range;
 
 use const PHP_VERSION_ID;
 
@@ -92,6 +104,7 @@ use const PHP_VERSION_ID;
 #[UsesClass(XmlCDataSection::class)]
 #[UsesClass(XmlIgnore::class)]
 #[UsesClass(CircularReferenceException::class)]
+#[UsesClass(InvalidXmlValueException::class)]
 class XmlEncoderTest extends TestCase
 {
     /**
@@ -1594,5 +1607,235 @@ class XmlEncoderTest extends TestCase
 
         self::assertXmlStringEqualsXmlString($expected, (string) $encoder->map($person));
         self::assertXmlStringEqualsXmlString($expected, (string) $encoder->map($person));
+    }
+
+    /**
+     * A control character that XML 1.0 does not allow in a document is refused
+     * in element text instead of being written into output no parser accepts.
+     */
+    #[Test]
+    public function rejectsAnIllegalCharacterInElementText(): void
+    {
+        $host       = new UnparseableValueHost();
+        $host->text = "a\x01b";
+
+        $this->expectUnusableValue('UnparseableValueHost.text', '0x01', 'offset 1');
+
+        $this->getXmlEncoder()->map($host);
+    }
+
+    /**
+     * The same refusal applies to a value written as an attribute.
+     */
+    #[Test]
+    public function rejectsAnIllegalCharacterInAnAttributeValue(): void
+    {
+        $host            = new UnparseableValueHost();
+        $host->attribute = "a\x01b";
+
+        $this->expectUnusableValue('UnparseableValueHost.attribute', '0x01', 'offset 1');
+
+        $this->getXmlEncoder()->map($host);
+    }
+
+    /**
+     * The same refusal applies to a value written as a CDATA section.
+     */
+    #[Test]
+    public function rejectsAnIllegalCharacterInACDataSection(): void
+    {
+        $host        = new UnparseableValueHost();
+        $host->cdata = "a\x01b";
+
+        $this->expectUnusableValue('UnparseableValueHost.cdata', '0x01', 'offset 1');
+
+        $this->getXmlEncoder()->map($host);
+    }
+
+    /**
+     * The same refusal applies to a value written as raw node text.
+     */
+    #[Test]
+    public function rejectsAnIllegalCharacterInANodeValue(): void
+    {
+        $host       = new UnparseableValueHost();
+        $host->body = "a\x01b";
+
+        $this->expectUnusableValue('UnparseableValueHost.body', '0x01', 'offset 1');
+
+        $this->getXmlEncoder()->map($host);
+    }
+
+    /**
+     * An entry of a collection is checked like any other value, and the position
+     * of the entry names it in the message.
+     */
+    #[Test]
+    public function rejectsAnIllegalCharacterInACollectionEntry(): void
+    {
+        $host       = new UnparseableValueHost();
+        $host->tags = ['fine', "a\x01b"];
+
+        $this->expectUnusableValue('UnparseableValueHost.tags[1]', '0x01', 'offset 1');
+
+        $this->getXmlEncoder()->map($host);
+    }
+
+    /**
+     * A value that is not a string but converts to one is checked on the
+     * converted string.
+     */
+    #[Test]
+    public function rejectsAnIllegalCharacterInAStringableValue(): void
+    {
+        $host             = new UnparseableValueHost();
+        $host->stringable = new UnparseableStringable();
+
+        $this->expectUnusableValue('UnparseableValueHost.stringable', '0x01', 'offset 1');
+
+        $this->getXmlEncoder()->map($host);
+    }
+
+    /**
+     * The offset counts bytes, not characters, so a multibyte character in front
+     * of the offending one moves it by its whole length.
+     */
+    #[Test]
+    public function reportsTheOffsetInBytes(): void
+    {
+        $host       = new UnparseableValueHost();
+        $host->text = "\u{E9}\x01";
+
+        $this->expectUnusableValue('UnparseableValueHost.text', '0x01', 'offset 2');
+
+        $this->getXmlEncoder()->map($host);
+    }
+
+    /**
+     * A value that is not valid UTF-8 has no code point to name, so the message
+     * says so instead.
+     */
+    #[Test]
+    public function rejectsAValueThatIsNotValidUtf8(): void
+    {
+        $host       = new UnparseableValueHost();
+        $host->text = "a\xC3\x28";
+
+        $this->expectUnusableValue('UnparseableValueHost.text', 'not valid UTF-8');
+
+        $this->getXmlEncoder()->map($host);
+    }
+
+    /**
+     * The two non-characters at the end of the basic plane are not allowed
+     * either, although they are well-formed UTF-8. This pins the upper end of
+     * the allowed range of that plane.
+     */
+    #[Test]
+    public function rejectsANonCharacterThatIsWellFormedUtf8(): void
+    {
+        $host       = new UnparseableValueHost();
+        $host->text = "a\u{FFFE}";
+
+        $this->expectUnusableValue('UnparseableValueHost.text', '0xEFBFBE', 'offset 1');
+
+        $this->getXmlEncoder()->map($host);
+    }
+
+    /**
+     * The value is checked after a type converter has run, so a converter
+     * cannot hand an unusable string past the check.
+     */
+    #[Test]
+    public function rejectsAnIllegalCharacterThatATypeConverterProduces(): void
+    {
+        $encoder = $this->getXmlEncoder();
+
+        $encoder->addType(
+            'string',
+            static fn (string $name, string $value): string => "x\x00y"
+        );
+
+        $this->expectUnusableValue('UnparseableValueHost.text', '0x00', 'offset 1');
+
+        $encoder->map(new UnparseableValueHost());
+    }
+
+    /**
+     * Every control character below the space is refused except the three that
+     * XML 1.0 allows, and so are both non-characters at the end of the basic
+     * plane, so neither a boundary nor a single character of the refused ranges
+     * moved.
+     */
+    #[Test]
+    public function rejectsEveryCharacterOutsideTheAllowedRanges(): void
+    {
+        $encoder    = $this->getXmlEncoder();
+        $accepted   = [];
+        $characters = array_merge(
+            array_map(chr(...), array_diff(range(0, 0x1F), [0x09, 0x0A, 0x0D])),
+            ["\u{FFFE}", "\u{FFFF}"]
+        );
+
+        foreach ($characters as $character) {
+            $host       = new UnparseableValueHost();
+            $host->text = $character;
+
+            try {
+                $encoder->map($host);
+
+                $accepted[] = bin2hex($character);
+            } catch (InvalidXmlValueException) {
+                // Refused, as intended.
+            }
+        }
+
+        self::assertSame([], $accepted);
+    }
+
+    /**
+     * Every character XML 1.0 allows still comes through and parses back
+     * unchanged, including the three whitespace controls, both ends of every
+     * allowed range and characters that sit just beside a refused one, such as
+     * the delete character. A check that refused too much would be as wrong as
+     * one that refused too little. This passes on code without the check as well,
+     * so it guards the allowed set and is not a regression test of the refusal.
+     */
+    #[Test]
+    public function encodesEveryCharacterThatXmlAllows(): void
+    {
+        $host       = new UnparseableValueHost();
+        $host->text = "\t\n\r \x7F\u{85}\u{2028}\u{FEFF}\u{D7FF}\u{E000}\u{FDD0}\u{FFFD}\u{10000}\u{10FFFF}";
+
+        $xml  = (string) $this->getXmlEncoder()->map($host);
+        $root = $this->parseDocumentElement($xml, 'A value made of allowed characters produced XML that cannot be parsed back');
+
+        self::assertSame(
+            $host->text,
+            $root->getElementsByTagName('text')->item(0)?->textContent
+        );
+    }
+
+    /**
+     * Expects the refusal of one value, and that its message names the property
+     * path and carries each given detail.
+     *
+     * @param string $path       The property path the message must name
+     * @param string ...$details Text the message must contain
+     */
+    private function expectUnusableValue(string $path, string ...$details): void
+    {
+        // PHPUnit keeps only the last message pattern it is given, so every
+        // required fragment goes into one pattern as a lookahead.
+        $pattern = '/' . implode(
+            '',
+            array_map(
+                static fn (string $fragment): string => '(?=.*' . preg_quote($fragment, '/') . ')',
+                ['"' . $path . '"', ...$details]
+            )
+        ) . '/s';
+
+        $this->expectException(InvalidXmlValueException::class);
+        $this->expectExceptionMessageMatches($pattern);
     }
 }

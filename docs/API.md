@@ -2,7 +2,7 @@
 
 The public surface of `magicsunday/xmlmapper` is intentionally small: one encoder
 class, one marker interface, the property markers, a name-converter contract and the
-exception the encoder raises.
+exceptions the encoder raises.
 
 ## `MagicSunday\XmlEncoder`
 
@@ -22,7 +22,8 @@ Symfony extractor.
 
 Encodes `$instance` and returns the XML document as a string, or `false` if
 `DOMDocument::saveXML()` fails. May throw `DOMException` for invalid element
-names, and `CircularReferenceException` for a cyclic object graph.
+names, `CircularReferenceException` for a cyclic object graph and
+`InvalidXmlValueException` for a value that XML 1.0 cannot carry.
 
 The root element is named after the object's short class name (passed through the
 name converter when one is configured). Properties with a `null` value are
@@ -84,3 +85,16 @@ as `Root.property.property`, with the position of a collection entry in brackets
 after its property, for example `Node.peer.peer` or `Tree.children[0]`. A nested
 `map()` call from a type closure adds the class name of its own root as a further
 segment after the property whose closure runs it, for example `Node.wrap.Wrap.next`.
+
+## `MagicSunday\XmlMapper\Exception\InvalidXmlValueException`
+
+A `RuntimeException` that `map()` throws when a value cannot be written into an XML 1.0
+document, because the document would not parse. That is the case for a character below
+the space other than tab, line feed and carriage return, for U+FFFE and U+FFFF, and for
+a string that is not valid UTF-8. The check covers every place a value is written
+(element text, attribute, CDATA section, raw node text and the entries of a collection)
+and the value a type converter returns. Nothing is stripped or replaced.
+
+The message names the property path in the notation of `CircularReferenceException`,
+for example `Book.title`. For a character it also gives the bytes of the character and
+its byte offset within the value.
