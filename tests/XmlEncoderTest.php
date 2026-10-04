@@ -690,18 +690,56 @@ class XmlEncoderTest extends TestCase
 
     /**
      * A cycle closed through an entry of a collection is found as well, and the
-     * path carries the entry index.
+     * path carries the entry index. The entry that closes the cycle follows one
+     * that does not, so the index has to be counted past the first position.
      */
     #[Test]
     public function throwsOnACycleThroughACollectionEntry(): void
     {
         $node             = new CyclicCollectionNode();
+        $node->children[] = new CyclicCollectionNode();
         $node->children[] = $node;
 
         $this->expectException(CircularReferenceException::class);
-        $this->expectExceptionMessageMatches('/' . preg_quote('"CyclicCollectionNode.children[0]"', '/') . '/');
+        $this->expectExceptionMessageMatches('/' . preg_quote('"CyclicCollectionNode.children[1]"', '/') . '/');
 
         $this->getXmlEncoder()->map($node);
+    }
+
+    /**
+     * The path names a property the way the object declares it, whatever the
+     * property name converter makes of it for the element name.
+     */
+    #[Test]
+    public function namesThePhpPropertyInThePathWhateverTheConverterMakesOfIt(): void
+    {
+        $extractor = new PropertyInfoExtractor(
+            [new ReflectionExtractor()],
+            [new PhpDocExtractor()]
+        );
+
+        $converter = new class implements PropertyNameConverterInterface {
+            /**
+             * Leaves the root element name alone and prefixes every property
+             * name, which is still a valid XML element name.
+             *
+             * @param string $name Raw class or property name
+             *
+             * @return string
+             */
+            public function convert(string $name): string
+            {
+                return $name === 'CyclicNode' ? $name : 'x' . $name;
+            }
+        };
+
+        $node       = new CyclicNode();
+        $node->peer = $node;
+
+        $this->expectException(CircularReferenceException::class);
+        $this->expectExceptionMessageMatches('/' . preg_quote('"CyclicNode.peer"', '/') . '/');
+
+        (new XmlEncoder($extractor, $converter))->map($node);
     }
 
     /**
