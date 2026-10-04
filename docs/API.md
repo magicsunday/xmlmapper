@@ -28,7 +28,8 @@ The root element is named after the object's short class name (passed through th
 name converter when one is configured). Properties with a `null` value are
 skipped, as are typed properties that were never assigned and, from PHP 8.4 on,
 write-only properties, which are virtual properties declared with a `set` hook and
-no `get` hook.
+no `get` hook. A static property is state of the class and not of the object, so it
+is never encoded.
 
 An object that is reached again while it is still being encoded, directly through
 one of its own properties or through other objects, would never finish encoding.

@@ -52,6 +52,8 @@ use MagicSunday\Test\Fixture\SerializableMoneyBag;
 use MagicSunday\Test\Fixture\SharedChildHost;
 use MagicSunday\Test\Fixture\SpecialMoney;
 use MagicSunday\Test\Fixture\SpecialMoneyHost;
+use MagicSunday\Test\Fixture\StaticMarkedHost;
+use MagicSunday\Test\Fixture\StaticPropertyHost;
 use MagicSunday\Test\Fixture\ThrowingKeyIterator;
 use MagicSunday\Test\Fixture\UninitializedHost;
 use MagicSunday\Test\Fixture\UnionObjectHost;
@@ -679,6 +681,59 @@ class XmlEncoderTest extends TestCase
                 XML,
             (string) $this->getXmlEncoder()->map($host)
         );
+    }
+
+    /**
+     * A static property is state of the class, not of the object, so it is left
+     * out of the XML. Every instance would otherwise carry the same value, and a
+     * counter or a cache kept in a static property would be serialized as data.
+     */
+    #[Test]
+    public function skipsAStaticProperty(): void
+    {
+        self::assertXmlStringEqualsXmlString(
+            <<<'XML'
+                <?xml version="1.0" encoding="UTF-8"?>
+                <staticPropertyHost>
+                    <own>instance</own>
+                </staticPropertyHost>
+                XML,
+            (string) $this->getXmlEncoder()->map(new StaticPropertyHost())
+        );
+    }
+
+    /**
+     * A static property is not read at all, so neither an XML marker on it nor a
+     * type converter registered for its declared type applies. The converter
+     * would otherwise run on class-level state, and the marker would write it
+     * as an attribute of the root element.
+     */
+    #[Test]
+    public function doesNotReadAStaticPropertyThatIsMarkedOrHasAConverter(): void
+    {
+        $calls   = 0;
+        $encoder = $this->getXmlEncoder();
+
+        $encoder->addType(
+            'int',
+            static function (string $name, int $value) use (&$calls): string {
+                ++$calls;
+
+                return 'converted:' . $value;
+            }
+        );
+
+        self::assertXmlStringEqualsXmlString(
+            <<<'XML'
+                <?xml version="1.0" encoding="UTF-8"?>
+                <staticMarkedHost>
+                    <own>instance</own>
+                </staticMarkedHost>
+                XML,
+            (string) $encoder->map(new StaticMarkedHost())
+        );
+
+        self::assertSame(0, $calls);
     }
 
     /**
