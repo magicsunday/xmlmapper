@@ -21,6 +21,7 @@ use MagicSunday\XmlMapper\Annotation\XmlIgnore;
 use MagicSunday\XmlMapper\Annotation\XmlNodeValue;
 use MagicSunday\XmlMapper\Converter\PropertyNameConverterInterface;
 use MagicSunday\XmlMapper\Exception\CircularReferenceException;
+use MagicSunday\XmlMapper\Exception\InvalidXmlValueException;
 use ReflectionClass;
 use ReflectionException;
 use ReflectionObject;
@@ -43,8 +44,11 @@ use function is_bool;
 use function is_iterable;
 use function is_scalar;
 use function method_exists;
+use function preg_match;
 use function spl_object_id;
 use function str_replace;
+
+use const PREG_OFFSET_CAPTURE;
 
 /**
  * XmlEncoder.
@@ -66,6 +70,16 @@ class XmlEncoder
         XmlCDataSection::class,
         XmlIgnore::class,
     ];
+
+    /**
+     * Matches the first character that XML 1.0 does not allow in a document: every
+     * character below the space except tab, line feed and carriage return, and
+     * the non-characters U+FFFE and U+FFFF. The surrogate range is left out of the
+     * allowed set too, but no valid UTF-8 string contains it. The unicode
+     * modifier makes the match fail outright on a string that is not valid
+     * UTF-8, which is how a surrogate or a truncated sequence is caught.
+     */
+    private const string ILLEGAL_XML_CHARACTER = '/[^\x{9}\x{A}\x{D}\x{20}-\x{D7FF}\x{E000}-\x{FFFD}\x{10000}-\x{10FFFF}]/u';
 
     /**
      * The document being built by the current map() call.
@@ -151,6 +165,7 @@ class XmlEncoder
      *
      * @throws DOMException
      * @throws CircularReferenceException When an object is reached again through its own properties
+     * @throws InvalidXmlValueException   When a value cannot be written into an XML 1.0 document
      */
     public function map(XmlSerializable $instance): string|false
     {
@@ -212,6 +227,7 @@ class XmlEncoder
      *
      * @throws DOMException
      * @throws CircularReferenceException When an object is reached again through its own properties
+     * @throws InvalidXmlValueException   When a value cannot be written into an XML 1.0 document
      */
     private function encodeElement(DOMElement $domElement, XmlSerializable $instance): void
     {
@@ -286,7 +302,7 @@ class XmlEncoder
                 $domElement
                     ->setAttribute(
                         $xmlPropertyName,
-                        $this->encodeValue($propertyValue)
+                        $this->encodeValueOfProperty($propertyName, $propertyValue)
                     );
 
                 continue;
@@ -297,7 +313,7 @@ class XmlEncoder
                 $domElement
                     ->appendChild(
                         $this->domDocument->createCDATASection(
-                            $this->encodeValue($propertyValue)
+                            $this->encodeValueOfProperty($propertyName, $propertyValue)
                         )
                     );
 
@@ -309,7 +325,7 @@ class XmlEncoder
                 $domElement
                     ->appendChild(
                         $this->domDocument->createTextNode(
-                            $this->encodeValue($propertyValue)
+                            $this->encodeValueOfProperty($propertyName, $propertyValue)
                         )
                     );
 
@@ -528,6 +544,7 @@ class XmlEncoder
      *
      * @throws DOMException
      * @throws CircularReferenceException When an object is reached again through its own properties
+     * @throws InvalidXmlValueException   When a value cannot be written into an XML 1.0 document
      */
     private function encodeCollection(DOMElement $parent, string $name, mixed $values): void
     {
@@ -562,6 +579,7 @@ class XmlEncoder
      *
      * @throws DOMException
      * @throws CircularReferenceException When an object is reached again through its own properties
+     * @throws InvalidXmlValueException   When a value cannot be written into an XML 1.0 document
      */
     private function encodeObjectOrScalar(DOMElement $parent, string $name, mixed $value): void
     {
@@ -597,6 +615,7 @@ class XmlEncoder
      *
      * @throws DOMException
      * @throws CircularReferenceException When the object is already being encoded further up the same path
+     * @throws InvalidXmlValueException   When a value cannot be written into an XML 1.0 document
      */
     private function encodeObject(?DOMElement $parent, string $name, XmlSerializable $value): void
     {
@@ -641,11 +660,33 @@ class XmlEncoder
     }
 
     /**
+     * Encodes the value of a property that is written outside the element walk,
+     * as an attribute, a CDATA section or raw node text. The property is on the
+     * path while the value is encoded, so a refused value is reported with it.
+     *
+     * @param string $propertyName  The name of the property
+     * @param mixed  $propertyValue The value of the property
+     *
+     * @throws InvalidXmlValueException When the value cannot be written into an XML 1.0 document
+     */
+    private function encodeValueOfProperty(string $propertyName, mixed $propertyValue): string
+    {
+        $this->propertyPath[] = $propertyName;
+
+        $encoded = $this->encodeValue($propertyValue);
+
+        array_pop($this->propertyPath);
+
+        return $encoded;
+    }
+
+    /**
      * Encodes the given scalar value to its string representation. Booleans are
      * rendered as their integer value; anything that is neither scalar nor
-     * Stringable yields an empty string.
+     * Stringable yields an empty string. A string that XML 1.0 cannot carry is
+     * refused, because the document it would end up in could not be parsed.
      *
-     * @return string
+     * @throws InvalidXmlValueException When the value cannot be written into an XML 1.0 document
      */
     private function encodeValue(mixed $propertyValue): string
     {
@@ -654,10 +695,37 @@ class XmlEncoder
         }
 
         if (is_scalar($propertyValue) || ($propertyValue instanceof Stringable)) {
-            return (string) $propertyValue;
+            return $this->assertWritableText((string) $propertyValue);
         }
 
         return '';
+    }
+
+    /**
+     * Returns the given text unchanged when XML 1.0 can carry it.
+     *
+     * @param string $text The text about to be written into the document
+     *
+     * @throws InvalidXmlValueException When the text contains a character XML 1.0 does not allow, or is not valid UTF-8
+     */
+    private function assertWritableText(string $text): string
+    {
+        $matches = [];
+        $found   = preg_match(self::ILLEGAL_XML_CHARACTER, $text, $matches, PREG_OFFSET_CAPTURE);
+
+        if ($found === false) {
+            throw InvalidXmlValueException::forEncoding($this->describePropertyPath());
+        }
+
+        if ($found === 1) {
+            throw InvalidXmlValueException::forCharacter(
+                $this->describePropertyPath(),
+                $matches[0][0],
+                $matches[0][1]
+            );
+        }
+
+        return $text;
     }
 
     /**
