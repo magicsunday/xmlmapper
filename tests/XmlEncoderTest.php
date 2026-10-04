@@ -45,6 +45,7 @@ use MagicSunday\Test\Fixture\NestedMapStateHost;
 use MagicSunday\Test\Fixture\Person;
 use MagicSunday\Test\Fixture\PlainArrayHost;
 use MagicSunday\Test\Fixture\PlainBody;
+use MagicSunday\Test\Fixture\PrefixingPropertyNameConverter;
 use MagicSunday\Test\Fixture\Price;
 use MagicSunday\Test\Fixture\SerializableMoney;
 use MagicSunday\Test\Fixture\SerializableMoneyBag;
@@ -718,28 +719,43 @@ class XmlEncoderTest extends TestCase
             [new PhpDocExtractor()]
         );
 
-        $converter = new class implements PropertyNameConverterInterface {
-            /**
-             * Leaves the root element name alone and prefixes every property
-             * name, which is still a valid XML element name.
-             *
-             * @param string $name Raw class or property name
-             *
-             * @return string
-             */
-            public function convert(string $name): string
-            {
-                return $name === 'CyclicNode' ? $name : 'x' . $name;
-            }
-        };
-
         $node       = new CyclicNode();
         $node->peer = $node;
 
         $this->expectException(CircularReferenceException::class);
         $this->expectExceptionMessageMatches('/' . preg_quote('"CyclicNode.peer"', '/') . '/');
 
-        (new XmlEncoder($extractor, $converter))->map($node);
+        (new XmlEncoder($extractor, new PrefixingPropertyNameConverter('CyclicNode')))->map($node);
+    }
+
+    /**
+     * The same holds while a type converter runs for the property, which is a
+     * separate step on the path from the one a plain property takes.
+     */
+    #[Test]
+    public function namesThePhpPropertyInThePathWhileItsTypeConverterRuns(): void
+    {
+        $extractor = new PropertyInfoExtractor(
+            [new ReflectionExtractor()],
+            [new PhpDocExtractor()]
+        );
+
+        $encoder = new XmlEncoder($extractor, new PrefixingPropertyNameConverter('CyclicNode'));
+
+        $encoder->addType(
+            CyclicNode::class,
+            static fn (string $name, CyclicNode $value): string => (string) $encoder->map($value)
+        );
+
+        $first        = new CyclicNode();
+        $second       = new CyclicNode();
+        $first->peer  = $second;
+        $second->peer = $first;
+
+        $this->expectException(CircularReferenceException::class);
+        $this->expectExceptionMessageMatches('/' . preg_quote('"CyclicNode.peer.CyclicNode.peer.CyclicNode"', '/') . '/');
+
+        $encoder->map($first);
     }
 
     /**
@@ -921,7 +937,10 @@ class XmlEncoderTest extends TestCase
         $encoder->addType(
             CyclicNode::class,
             static function (string $name, ?CyclicNode $value) use ($leaf, &$failures): ?CyclicNode {
-                if (($value === $leaf) && (++$failures === 1)) {
+                if (
+                    ($value === $leaf)
+                    && (++$failures === 1)
+                ) {
                     throw new LogicException('The first conversion of the leaf fails.');
                 }
 
