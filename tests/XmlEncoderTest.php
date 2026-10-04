@@ -24,6 +24,8 @@ use MagicSunday\Test\Fixture\EscapeCDataHost;
 use MagicSunday\Test\Fixture\EscapeHost;
 use MagicSunday\Test\Fixture\EscapeMarkerHost;
 use MagicSunday\Test\Fixture\IgnoreHost;
+use MagicSunday\Test\Fixture\IgnoreRedeclaredHost;
+use MagicSunday\Test\Fixture\IgnoreRepeatedHost;
 use MagicSunday\Test\Fixture\InterfaceMoneyHost;
 use MagicSunday\Test\Fixture\Money;
 use MagicSunday\Test\Fixture\MoneyBag;
@@ -855,6 +857,39 @@ class XmlEncoderTest extends TestCase
             ->map(new IgnoreHost());
 
         self::assertSame(['kept'], $seen);
+    }
+
+    /**
+     * The marker is read from the property declaration of the concrete class, so
+     * a subclass that redeclares an ignored property has to repeat it.
+     *
+     * Without the marker on the redeclaration the property is encoded again, and
+     * that is pinned on purpose because the documentation states it. The second
+     * assertion is a characterization: it does not fail on the code before the
+     * marker existed, so it documents the boundary and is not a regression guard.
+     */
+    #[Test]
+    public function requiresTheIgnoreMarkerToBeRepeatedOnARedeclaredProperty(): void
+    {
+        $encoder = $this->getXmlEncoder();
+
+        self::assertXmlStringEqualsXmlString(
+            <<<'XML'
+                <?xml version="1.0" encoding="UTF-8"?>
+                <ignoreRepeatedHost/>
+                XML,
+            (string) $encoder->map(new IgnoreRepeatedHost())
+        );
+
+        self::assertXmlStringEqualsXmlString(
+            <<<'XML'
+                <?xml version="1.0" encoding="UTF-8"?>
+                <ignoreRedeclaredHost>
+                    <token>child-secret</token>
+                </ignoreRedeclaredHost>
+                XML,
+            (string) $encoder->map(new IgnoreRedeclaredHost())
+        );
     }
 
     /**

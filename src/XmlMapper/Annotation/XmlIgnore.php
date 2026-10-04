@@ -18,7 +18,9 @@ use Attribute;
  * XML at all. Apply it as a native PHP attribute (#[XmlIgnore]).
  *
  * The property is not read, so no custom type converter runs for it. The marker
- * takes precedence over every other marker on the same property.
+ * takes precedence over every other marker on the same property. Like every
+ * marker it is read from the property declaration of the concrete class, so a
+ * subclass that redeclares the property has to repeat it.
  *
  * @author  Rico Sonntag <mail@ricosonntag.de>
  * @license https://opensource.org/licenses/MIT
