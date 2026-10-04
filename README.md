@@ -142,6 +142,7 @@ Each marker is applied as a native PHP attribute (shown above).
 | `XmlAttribute`     | Render the value as an attribute of the surrounding element.        |
 | `XmlNodeValue`     | Render the value as the raw text content of the surrounding element.|
 | `XmlCDataSection`  | Wrap the value in a `<![CDATA[ … ]]>` section (markup left intact). |
+| `XmlIgnore`        | Leave the property out of the XML; it is not read at all.           |
 
 ### Custom types
 

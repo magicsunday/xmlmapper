@@ -23,6 +23,7 @@ use MagicSunday\Test\Fixture\CustomTypeHost;
 use MagicSunday\Test\Fixture\EscapeCDataHost;
 use MagicSunday\Test\Fixture\EscapeHost;
 use MagicSunday\Test\Fixture\EscapeMarkerHost;
+use MagicSunday\Test\Fixture\IgnoreHost;
 use MagicSunday\Test\Fixture\InterfaceMoneyHost;
 use MagicSunday\Test\Fixture\Money;
 use MagicSunday\Test\Fixture\MoneyBag;
@@ -48,6 +49,7 @@ use MagicSunday\Test\Fixture\VisibilityHost;
 use MagicSunday\XmlEncoder;
 use MagicSunday\XmlMapper\Annotation\XmlAttribute;
 use MagicSunday\XmlMapper\Annotation\XmlCDataSection;
+use MagicSunday\XmlMapper\Annotation\XmlIgnore;
 use MagicSunday\XmlMapper\Annotation\XmlNodeValue;
 use MagicSunday\XmlMapper\Converter\CamelCasePropertyNameConverter;
 use MagicSunday\XmlMapper\Converter\PropertyNameConverterInterface;
@@ -70,6 +72,7 @@ use Symfony\Component\PropertyInfo\PropertyInfoExtractor;
 #[UsesClass(XmlAttribute::class)]
 #[UsesClass(XmlNodeValue::class)]
 #[UsesClass(XmlCDataSection::class)]
+#[UsesClass(XmlIgnore::class)]
 class XmlEncoderTest extends TestCase
 {
     /**
@@ -798,6 +801,60 @@ class XmlEncoderTest extends TestCase
         );
 
         self::assertStringNotContainsString('computed', $xml);
+    }
+
+    /**
+     * The ignore marker takes a property out of the output whatever shape it has:
+     * a plain public property, one that also carries another marker, a private
+     * field the extractor reports through its accessor, and a whole collection.
+     *
+     * The only property without the marker stays, so the exclusion is per
+     * property and not a blanket drop. Compared as parsed XML plus a literal
+     * absence check, because the leaked value is exactly what must not appear.
+     */
+    #[Test]
+    public function omitsPropertiesMarkedAsIgnored(): void
+    {
+        $xml = (string) $this->getXmlEncoder()->map(new IgnoreHost());
+
+        self::assertXmlStringEqualsXmlString(
+            <<<'XML'
+                <?xml version="1.0" encoding="UTF-8"?>
+                <ignoreHost>
+                    <kept>kept</kept>
+                </ignoreHost>
+                XML,
+            $xml
+        );
+
+        self::assertStringNotContainsString('token', $xml);
+        self::assertStringNotContainsString('skipped', $xml);
+        self::assertStringNotContainsString('Intro', $xml);
+    }
+
+    /**
+     * An ignored property is not touched at all, so a custom type converter
+     * registered for its type never sees it. Otherwise a converter with a side
+     * effect, or one that throws on the hidden value, would still run for data
+     * the author asked to keep out.
+     */
+    #[Test]
+    public function doesNotPassAnIgnoredPropertyToACustomTypeConverter(): void
+    {
+        $seen = [];
+
+        $this->getXmlEncoder()
+            ->addType(
+                'string',
+                static function (string $name, string $value) use (&$seen): string {
+                    $seen[] = $name;
+
+                    return $value;
+                }
+            )
+            ->map(new IgnoreHost());
+
+        self::assertSame(['kept'], $seen);
     }
 
     /**

@@ -1,6 +1,6 @@
-# Markers: attributes, node values and CDATA
+# Markers: attributes, node values, CDATA and ignored properties
 
-By default every property becomes a child element. Three markers change that for an
+By default every property becomes a child element. These markers change that for an
 individual property. Each marker is written as a **native PHP attribute**.
 
 | Marker             | Syntax               | Effect                                            |
@@ -8,8 +8,9 @@ individual property. Each marker is written as a **native PHP attribute**.
 | `XmlAttribute`     | `#[XmlAttribute]`    | Value becomes an attribute of the element.        |
 | `XmlNodeValue`     | `#[XmlNodeValue]`    | Value becomes the element's raw text content.     |
 | `XmlCDataSection`  | `#[XmlCDataSection]` | Value is wrapped in `<![CDATA[ … ]]>`.            |
+| `XmlIgnore`        | `#[XmlIgnore]`       | Property is left out of the XML entirely.         |
 
-All three target a property.
+All of them target a property.
 
 > The example outputs below assume an encoder wired with the
 > `CamelCasePropertyNameConverter` (as in the [quick start](../../README.md)), which
@@ -62,9 +63,45 @@ final class Comment implements XmlSerializable
 Without the marker the same property would be escaped to
 `<body>&lt;b&gt;hi&lt;/b&gt;</body>`.
 
+## Ignored properties
+
+`XmlIgnore` keeps a property out of the output. The encoder neither reads the
+property nor passes it to a custom type converter, and the marker wins over any
+other marker on the same property.
+
+```php
+use MagicSunday\XmlSerializable;
+use MagicSunday\XmlMapper\Annotation\XmlIgnore;
+
+final class Account implements XmlSerializable
+{
+    public string $name = 'jane';
+
+    #[XmlIgnore]
+    private string $token = 'secret';
+
+    public function getToken(): string
+    {
+        return $this->token;
+    }
+}
+```
+
+```xml
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<account>
+  <name>jane</name>
+</account>
+```
+
+Without the marker the private field would be encoded, because the list extractor
+reports it through its public getter. See
+[Manual instantiation](manual-instantiation.md) for how the extractor decides.
+
 ## Notes
 
-- A property may carry at most one of these markers; the encoder checks them in the
-  order attribute → CDATA → node value and uses the first that matches.
+- Apart from `XmlIgnore`, a property may carry at most one of these markers; the
+  encoder checks them in the order attribute → CDATA → node value and uses the first
+  that matches. `XmlIgnore` is checked before all of them.
 - Markers are read per property by reflection, so they work on any public property
   of an `XmlSerializable` class, including nested objects.

@@ -17,6 +17,7 @@ use DOMElement;
 use DOMException;
 use MagicSunday\XmlMapper\Annotation\XmlAttribute;
 use MagicSunday\XmlMapper\Annotation\XmlCDataSection;
+use MagicSunday\XmlMapper\Annotation\XmlIgnore;
 use MagicSunday\XmlMapper\Annotation\XmlNodeValue;
 use MagicSunday\XmlMapper\Converter\PropertyNameConverterInterface;
 use ReflectionClass;
@@ -56,6 +57,7 @@ class XmlEncoder
         XmlAttribute::class,
         XmlNodeValue::class,
         XmlCDataSection::class,
+        XmlIgnore::class,
     ];
 
     /**
@@ -183,6 +185,12 @@ class XmlEncoder
         // Process all properties of the class
         foreach ($properties as $propertyName) {
             if (!$reflection->hasProperty($propertyName)) {
+                continue;
+            }
+
+            // An ignored property is left alone before anything touches it: no
+            // read, no custom type converter and no other marker applies.
+            if ($this->hasPropertyAnnotation($className, $propertyName, XmlIgnore::class)) {
                 continue;
             }
 
