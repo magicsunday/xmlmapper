@@ -8,12 +8,13 @@ exceptions the encoder raises.
 
 Encodes a PHP object graph into an XML string.
 
-### `__construct(PropertyInfoExtractorInterface $extractor, ?PropertyNameConverterInterface $nameConverter = null)`
+### `__construct(PropertyInfoExtractorInterface $extractor, ?PropertyNameConverterInterface $nameConverter = null, bool $strict = false)`
 
 | Parameter        | Type                                          | Description                                                                 |
 |------------------|-----------------------------------------------|-----------------------------------------------------------------------------|
 | `$extractor`     | `Symfony\Component\PropertyInfo\PropertyInfoExtractorInterface` | Resolves the list of properties and each property's type.                   |
 | `$nameConverter` | `PropertyNameConverterInterface\|null`         | Optional. Converts class and property names into element names. Default `null` (raw names are used). |
+| `$strict`        | `bool`                                        | Optional. When `true`, `map()` throws `UnmappableValueException` for a value it cannot map instead of dropping it. Default `false`. |
 
 See [Manual instantiation](recipes/manual-instantiation.md) for how to wire the
 Symfony extractor.
@@ -22,8 +23,9 @@ Symfony extractor.
 
 Encodes `$instance` and returns the XML document as a string, or `false` if
 `DOMDocument::saveXML()` fails. May throw `DOMException` for invalid element
-names, `CircularReferenceException` for a cyclic object graph and
-`InvalidXmlValueException` for a value that XML 1.0 cannot carry.
+names, `CircularReferenceException` for a cyclic object graph,
+`InvalidXmlValueException` for a value that XML 1.0 cannot carry and, from a strict
+encoder, `UnmappableValueException` for a value it cannot map.
 
 The root element is named after the object's short class name (passed through the
 name converter when one is configured). Properties with a `null` value are
@@ -31,6 +33,28 @@ skipped, as are typed properties that were never assigned and, from PHP 8.4 on,
 write-only properties, which are virtual properties declared with a `set` hook and
 no `get` hook. A static property is state of the class and not of the object, so it
 is never encoded.
+
+A lenient encoder, which is the default, drops a value it cannot map and gives no
+signal. An enum case, a closure or a resource is such a value wherever it is written as
+text. These are the cases that arise from the shape of the model:
+
+- A nested object that implements neither `XmlSerializable` nor `Stringable` becomes an
+  empty element.
+- An array property whose type no type extractor resolved to a collection becomes one
+  empty element, which is what happens without a `@var` annotation when no type
+  extractor reads native types.
+- A property that carries a marker (`XmlAttribute`, `XmlNodeValue` or
+  `XmlCDataSection`) and holds a collection, or an object that is not `Stringable`, is
+  written as an empty value, because a marker writes one scalar.
+- A collection property whose custom type closure returns something that cannot be
+  iterated is left out. A closure that returns `null` leaves the property out like any
+  other `null` value, in a lenient and in a strict encoder alike.
+
+A strict encoder (`new XmlEncoder($extractor, $nameConverter, true)`) throws
+`UnmappableValueException` in each of these cases instead, except for a `null` result,
+with a message that names the property path and the type of the value. A `Stringable`
+object is written as its text and a `null` entry of a collection stays an empty element,
+in both modes. Everything else is encoded exactly as by a lenient encoder.
 
 An object that is reached again while it is still being encoded, directly through
 one of its own properties or through other objects, would never finish encoding.
@@ -85,6 +109,13 @@ as `Root.property.property`, with the position of a collection entry in brackets
 after its property, for example `Node.peer.peer` or `Tree.children[0]`. A nested
 `map()` call from a type closure adds the class name of its own root as a further
 segment after the property whose closure runs it, for example `Node.wrap.Wrap.next`.
+
+## `MagicSunday\XmlMapper\Exception\UnmappableValueException`
+
+A `RuntimeException` that a strict encoder throws when it meets a value it cannot map,
+see the cases listed under `map()`. The message names the property path in the
+notation of `CircularReferenceException` and the type of the value, for example
+`Catalog.tags` and `array`. A lenient encoder never throws it.
 
 ## `MagicSunday\XmlMapper\Exception\InvalidXmlValueException`
 

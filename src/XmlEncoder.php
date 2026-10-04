@@ -22,6 +22,7 @@ use MagicSunday\XmlMapper\Annotation\XmlNodeValue;
 use MagicSunday\XmlMapper\Converter\PropertyNameConverterInterface;
 use MagicSunday\XmlMapper\Exception\CircularReferenceException;
 use MagicSunday\XmlMapper\Exception\InvalidXmlValueException;
+use MagicSunday\XmlMapper\Exception\UnmappableValueException;
 use ReflectionClass;
 use ReflectionException;
 use ReflectionObject;
@@ -38,6 +39,7 @@ use Symfony\Component\TypeInfo\TypeIdentifier;
 use function array_fill_keys;
 use function array_key_exists;
 use function array_pop;
+use function get_debug_type;
 use function implode;
 use function is_array;
 use function is_bool;
@@ -128,6 +130,7 @@ class XmlEncoder
      *
      * @param PropertyInfoExtractorInterface      $extractor
      * @param PropertyNameConverterInterface|null $nameConverter A name converter instance
+     * @param bool                                $strict        Whether to refuse a value that cannot be mapped instead of dropping it silently
      */
     public function __construct(
         private readonly PropertyInfoExtractorInterface $extractor,
@@ -135,6 +138,7 @@ class XmlEncoder
          * The property name converter instance.
          */
         protected ?PropertyNameConverterInterface $nameConverter = null,
+        private readonly bool $strict = false,
     ) {
         $this->defaultType = new BuiltinType(TypeIdentifier::STRING);
     }
@@ -166,6 +170,7 @@ class XmlEncoder
      * @throws DOMException
      * @throws CircularReferenceException When an object is reached again through its own properties
      * @throws InvalidXmlValueException   When a value cannot be written into an XML 1.0 document
+     * @throws UnmappableValueException   When a strict encoder meets a value it cannot map
      */
     public function map(XmlSerializable $instance): string|false
     {
@@ -228,6 +233,7 @@ class XmlEncoder
      * @throws DOMException
      * @throws CircularReferenceException When an object is reached again through its own properties
      * @throws InvalidXmlValueException   When a value cannot be written into an XML 1.0 document
+     * @throws UnmappableValueException   When a strict encoder meets a value it cannot map
      */
     private function encodeElement(DOMElement $domElement, XmlSerializable $instance): void
     {
@@ -545,10 +551,18 @@ class XmlEncoder
      * @throws DOMException
      * @throws CircularReferenceException When an object is reached again through its own properties
      * @throws InvalidXmlValueException   When a value cannot be written into an XML 1.0 document
+     * @throws UnmappableValueException   When a strict encoder meets a value it cannot map
      */
     private function encodeCollection(DOMElement $parent, string $name, mixed $values): void
     {
         if (!is_iterable($values)) {
+            if ($this->strict) {
+                throw UnmappableValueException::forCollection(
+                    $this->describePropertyPath(),
+                    get_debug_type($values)
+                );
+            }
+
             return;
         }
 
@@ -580,6 +594,7 @@ class XmlEncoder
      * @throws DOMException
      * @throws CircularReferenceException When an object is reached again through its own properties
      * @throws InvalidXmlValueException   When a value cannot be written into an XML 1.0 document
+     * @throws UnmappableValueException   When a strict encoder meets a value it cannot map
      */
     private function encodeObjectOrScalar(DOMElement $parent, string $name, mixed $value): void
     {
@@ -616,6 +631,7 @@ class XmlEncoder
      * @throws DOMException
      * @throws CircularReferenceException When the object is already being encoded further up the same path
      * @throws InvalidXmlValueException   When a value cannot be written into an XML 1.0 document
+     * @throws UnmappableValueException   When a strict encoder meets a value it cannot map
      */
     private function encodeObject(?DOMElement $parent, string $name, XmlSerializable $value): void
     {
@@ -668,6 +684,7 @@ class XmlEncoder
      * @param mixed  $propertyValue The value of the property
      *
      * @throws InvalidXmlValueException When the value cannot be written into an XML 1.0 document
+     * @throws UnmappableValueException When a strict encoder meets a value it cannot map
      */
     private function encodeValueOfProperty(string $propertyName, mixed $propertyValue): string
     {
@@ -682,11 +699,13 @@ class XmlEncoder
 
     /**
      * Encodes the given scalar value to its string representation. Booleans are
-     * rendered as their integer value; anything that is neither scalar nor
-     * Stringable yields an empty string. A string that XML 1.0 cannot carry is
-     * refused, because the document it would end up in could not be parsed.
+     * rendered as their integer value. Anything that is neither scalar nor
+     * Stringable yields an empty string, or is refused by a strict encoder, which
+     * leaves a null value empty all the same. A string that XML 1.0 cannot carry
+     * is refused, because the document it would end up in could not be parsed.
      *
      * @throws InvalidXmlValueException When the value cannot be written into an XML 1.0 document
+     * @throws UnmappableValueException When a strict encoder meets a value it cannot map
      */
     private function encodeValue(mixed $propertyValue): string
     {
@@ -696,6 +715,16 @@ class XmlEncoder
 
         if (is_scalar($propertyValue) || ($propertyValue instanceof Stringable)) {
             return $this->assertWritableText((string) $propertyValue);
+        }
+
+        if (
+            $this->strict
+            && ($propertyValue !== null)
+        ) {
+            throw UnmappableValueException::forValue(
+                $this->describePropertyPath(),
+                get_debug_type($propertyValue)
+            );
         }
 
         return '';

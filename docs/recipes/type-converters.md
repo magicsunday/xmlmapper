@@ -69,8 +69,9 @@ A class key matches the property's **own declared type** only — it is not
 resolved through the inheritance chain, so a converter registered for a parent
 class does not fire for a property declared as a subclass. A collection of
 that class (`@var Money[]`) likewise resolves to the builtin key `array`, so the class
-closure is not applied per entry — and because `Money` does not implement
-`XmlSerializable`, each entry then renders as an empty element without an error.
+closure is not applied per entry. Because `Money` does not implement
+`XmlSerializable`, a lenient encoder renders each entry as an empty element without
+an error, and a strict one refuses it.
 
 If the class **does** implement `XmlSerializable`, a missed class key is not
 harmless: the encoder walks the object and writes out every property the
