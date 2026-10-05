@@ -15,6 +15,7 @@ use MagicSunday\XmlMapper\Converter\CamelCasePropertyNameConverter;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
 
 /**
  * Class CamelCasePropertyNameConverterTest.
@@ -39,5 +40,21 @@ class CamelCasePropertyNameConverterTest extends TestCase
         self::assertSame('camelCaseProperty', $converter->convert('camel-case-property'));
         self::assertSame('camelCaseProperty', $converter->convert('camel case property'));
         self::assertSame('camelCaseProperty', $converter->convert('Camel Case Property'));
+    }
+
+    /**
+     * Tests that the converter is a final, read-only value, so it cannot be
+     * subclassed into one that holds changing state.
+     *
+     * Reads state only. It fails on the code before the change, where the
+     * class was neither final nor read-only.
+     */
+    #[Test]
+    public function isAFinalReadOnlyClass(): void
+    {
+        $class = new ReflectionClass(CamelCasePropertyNameConverter::class);
+
+        self::assertTrue($class->isFinal());
+        self::assertTrue($class->isReadOnly());
     }
 }

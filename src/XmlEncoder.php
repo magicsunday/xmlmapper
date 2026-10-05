@@ -132,10 +132,7 @@ class XmlEncoder
      */
     public function __construct(
         private readonly PropertyInfoExtractorInterface $extractor,
-        /**
-         * The property name converter instance.
-         */
-        protected ?PropertyNameConverterInterface $nameConverter = null,
+        private readonly ?PropertyNameConverterInterface $nameConverter = null,
         private readonly bool $strict = false,
     ) {
         $this->defaultType = new BuiltinType(TypeIdentifier::STRING);

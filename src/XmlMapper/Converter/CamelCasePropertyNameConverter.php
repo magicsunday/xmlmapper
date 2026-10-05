@@ -21,12 +21,12 @@ use Doctrine\Inflector\InflectorFactory;
  * @license https://opensource.org/licenses/MIT
  * @link    https://github.com/magicsunday/xmlmapper/
  */
-class CamelCasePropertyNameConverter implements PropertyNameConverterInterface
+final readonly class CamelCasePropertyNameConverter implements PropertyNameConverterInterface
 {
     /**
      * The inflector that performs the camel-case conversion.
      */
-    private readonly Inflector $inflector;
+    private Inflector $inflector;
 
     /**
      * Constructor.
@@ -39,9 +39,9 @@ class CamelCasePropertyNameConverter implements PropertyNameConverterInterface
     /**
      * Converts the specified property name to another format.
      *
-     * @param string $name
+     * @param string $name The property name in any common notation, such as snake case or kebab case
      *
-     * @return string
+     * @return string The property name in camel case
      */
     public function convert(string $name): string
     {
