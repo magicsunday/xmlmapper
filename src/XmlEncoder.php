@@ -766,7 +766,7 @@ class XmlEncoder
      */
     private function getClassShortName(XmlSerializable $instance): string
     {
-        return (new ReflectionClass($instance))->getShortName();
+        return new ReflectionClass($instance)->getShortName();
     }
 
     /**

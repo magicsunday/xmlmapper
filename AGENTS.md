@@ -4,7 +4,7 @@ This repository hosts `magicsunday/xmlmapper` — a standalone PHP library that 
 The public surface is small: an object implements the `MagicSunday\XmlSerializable` marker interface, `XmlEncoder::map()` turns it into XML, and the property attributes plus an optional name converter steer how each property is rendered.
 
 ## Setup/env
-- PHP 8.3+ with the `dom` and `xml` extensions. Composer installs into `.build/vendor` (**not** `vendor/`) — remember this when pointing tools at dependencies or when reading a stack trace.
+- PHP 8.4+ with the `dom` and `xml` extensions. Composer installs into `.build/vendor` (**not** `vendor/`) — remember this when pointing tools at dependencies or when reading a stack trace.
 - **All PHP and Composer commands run inside the webtrees Docker buildbox, never on the NAS host:**
   ```
   cd /volume2/docker/webtrees && docker compose run --rm \
@@ -24,7 +24,7 @@ The public surface is small: an object implements the `MagicSunday\XmlSerializab
 - Auto-fix: `composer ci:cgl` (PHP-CS-Fixer), `composer ci:rector`. Run them until stable — a fix can create new work for the other.
 - Coverage: `composer ci:test:php:unit:coverage`.
 - PHPStan runs at **level max** with strict-rules over `src/` **and** `tests/`, and with checked exceptions (every thrown checked exception needs a `@throws`, and a stale one is reported). The checked-exception contract is enforced on `src/`, where callers depend on it, and `phpstan.neon` carries a scoped ignore of that one identifier for `tests/`. Test code is otherwise held to the same bar as production code; a fixture that only satisfies the analyser is a smell.
-- The GitHub build job invokes the granular `ci:test:php:*` steps individually on a `8.3 / 8.4 / 8.5` matrix — it does **not** call the `ci:test` aggregate. A new gate wired only into the aggregate runs locally but never in CI.
+- The GitHub build job invokes the granular `ci:test:php:*` steps individually on a `8.4 / 8.5` matrix — it does **not** call the `ci:test` aggregate. A new gate wired only into the aggregate runs locally but never in CI.
 
 ## Architecture
 
