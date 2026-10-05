@@ -19,7 +19,7 @@
 
 <!-- Row 3: Compatibility badges -->
 <p align="center">
-  <a href="composer.json"><img src="https://img.shields.io/badge/php-8.3%20%7C%208.4%20%7C%208.5-blue" alt="PHP Version"></a>
+  <a href="composer.json"><img src="https://img.shields.io/badge/php-8.4%20%7C%208.5-blue" alt="PHP Version"></a>
 </p>
 
 <!-- Row 4: Project badges -->
@@ -36,7 +36,7 @@ XmlMapper is a PHP library that maps strongly-typed PHP objects (DTOs, value obj
 | Key      | Value                                              |
 |----------|----------------------------------------------------|
 | Package  | `magicsunday/xmlmapper`                            |
-| PHP      | `^8.3`                                             |
+| PHP      | `^8.4`                                             |
 | Main API | `MagicSunday\XmlEncoder`                           |
 | Output   | XML string (`string`); `false` only if serialization itself fails |
 | Errors   | `CircularReferenceException` for a cyclic object graph, `InvalidXmlValueException` for a value XML cannot carry, `UnmappableValueException` for a value a strict encoder cannot map, `DOMException` for an invalid element name |
@@ -167,7 +167,7 @@ $encoder->addType('bool', static fn (string $name, mixed $value): string => $val
 
 Prerequisites:
 
-- PHP `^8.3`
+- PHP `^8.4`
 - Extensions: `dom`, `xml`
 - Node.js (for the copy-paste detection gate, run via `npx`)
 

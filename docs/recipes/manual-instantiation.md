@@ -32,7 +32,7 @@ $encoder = new XmlEncoder($extractor, new CamelCasePropertyNameConverter());
 - Values are read **as fields**, not through the accessor. A getter that
   formats, rounds or redacts its value therefore has no effect on the output,
   and a purely virtual property — an accessor with no backing field — is
-  skipped entirely. A property declared with property hooks (PHP 8.4) is a real
+  skipped entirely. A property declared with property hooks is a real
   property and is read like any other, through its `get` hook where it has one.
   The exception is a write-only one, which has a `set` hook and no `get` hook and
   is skipped.

@@ -48,6 +48,6 @@ return static function (RectorConfig $rectorConfig): void {
     $rectorConfig->cacheDirectory(__DIR__ . '/.build/cache/.rector.cache');
     $rectorConfig->containerCacheDirectory(__DIR__ . '/.build/cache/.rector.container.cache');
 
-    // The shared rule sets and skips; 80300 is this package's PHP floor.
-    (require __DIR__ . '/.build/vendor/magicsunday/coding-standard/rector/base.php')($rectorConfig, 80300);
+    // The shared rule sets and skips; 80400 is this package's PHP floor.
+    (require __DIR__ . '/.build/vendor/magicsunday/coding-standard/rector/base.php')($rectorConfig, 80400);
 };

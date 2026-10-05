@@ -29,9 +29,9 @@ encoder, `UnmappableValueException` for a value it cannot map.
 
 The root element is named after the object's short class name (passed through the
 name converter when one is configured). Properties with a `null` value are
-skipped, as are typed properties that were never assigned and, from PHP 8.4 on,
-write-only properties, which are virtual properties declared with a `set` hook and
-no `get` hook. A static property is state of the class and not of the object, so it
+skipped, as are typed properties that were never assigned and write-only
+properties, which are virtual properties declared with a `set` hook and no `get`
+hook. A static property is state of the class and not of the object, so it
 is never encoded.
 
 A lenient encoder, which is the default, drops a value it cannot map and gives no
