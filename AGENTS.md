@@ -11,7 +11,7 @@ The public surface is small: an object implements the `MagicSunday\XmlSerializab
       -v /volume2/docker:/var/docker -e COMPOSER_AUTH buildbox \
       composer -d /var/docker/xmlmapper <script>
   ```
-- There is no Makefile and no build step; the library ships source only. Node is the one non-PHP dependency: `ci:test:php:cpd` runs `npx jscpd`, and a `post-update-cmd` installs it via `npm install jscpd@^5.0.11`. A `ci:test` that dies at the cpd step outside the buildbox is a missing prerequisite, not a broken script.
+- There is no Makefile and no build step; the library ships source only. Node is the one non-PHP dependency: `ci:test:php:cpd` runs the installed `node_modules/.bin/jscpd`, so run `npm ci` once first. jscpd is pinned to an exact version in `package.json`. CI runs it as its own job through the shared `cpd.yml` workflow of the `.github` repository, reported as `cpd / Copy-paste detection`. A `ci:test` that dies at the cpd step outside the buildbox is a missing prerequisite, not a broken script.
 - `composer.lock` is **not** committed. CI therefore resolves dev dependencies fresh on every run, so a caret-ranged dev tool can pick up a newer version in CI than a local install has. A green local run is not by itself evidence that CI will be green.
 
 ## Build & tests
