@@ -39,7 +39,7 @@ XmlMapper is a PHP library that maps strongly-typed PHP objects (DTOs, value obj
 | PHP      | `^8.3`                                             |
 | Main API | `MagicSunday\XmlEncoder`                           |
 | Output   | XML string (`string`); `false` only if serialization itself fails |
-| Errors   | `CircularReferenceException` for a cyclic object graph, `InvalidXmlValueException` for a value XML cannot carry, `DOMException` for an invalid element name |
+| Errors   | `CircularReferenceException` for a cyclic object graph, `InvalidXmlValueException` for a value XML cannot carry, `UnmappableValueException` for a value a strict encoder cannot map, `DOMException` for an invalid element name |
 
 ## ❓ What is this?
 XmlMapper takes a PHP object implementing `MagicSunday\XmlSerializable` and renders it as XML, including nested objects, scalar and object collections, and custom types. Property values are routed to elements, attributes, raw text nodes or CDATA sections via a small set of annotations, and property names can be converted on the fly (e.g. snake_case to camelCase).
@@ -102,7 +102,7 @@ $extractor = new PropertyInfoExtractor(
     // PhpDocExtractor resolves `@var` generics such as `Chapter[]`;
     // ReflectionExtractor covers native types, so an array property without a
     // docblock is still recognised as a collection instead of being silently
-    // rendered as one empty element.
+    // rendered by a lenient encoder as one empty element.
     [new PhpDocExtractor(), new ReflectionExtractor()]
 );
 

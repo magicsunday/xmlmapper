@@ -33,6 +33,7 @@ use MagicSunday\Test\Fixture\IgnoreRedeclaredHost;
 use MagicSunday\Test\Fixture\IgnoreRepeatedHost;
 use MagicSunday\Test\Fixture\InterfaceMoneyHost;
 use MagicSunday\Test\Fixture\IteratorCollectionHost;
+use MagicSunday\Test\Fixture\MarkedCollectionHost;
 use MagicSunday\Test\Fixture\Money;
 use MagicSunday\Test\Fixture\MoneyBag;
 use MagicSunday\Test\Fixture\MoneyHost;
@@ -42,9 +43,11 @@ use MagicSunday\Test\Fixture\NativeMarkers;
 use MagicSunday\Test\Fixture\NativeWithForeignAttribute;
 use MagicSunday\Test\Fixture\NativeWithForeignDocblock;
 use MagicSunday\Test\Fixture\NestedMapStateHost;
+use MagicSunday\Test\Fixture\NullableEntryCollectionHost;
 use MagicSunday\Test\Fixture\Person;
 use MagicSunday\Test\Fixture\PlainArrayHost;
 use MagicSunday\Test\Fixture\PlainBody;
+use MagicSunday\Test\Fixture\PlainStringable;
 use MagicSunday\Test\Fixture\PrefixingPropertyNameConverter;
 use MagicSunday\Test\Fixture\Price;
 use MagicSunday\Test\Fixture\SerializableMoney;
@@ -71,6 +74,7 @@ use MagicSunday\XmlMapper\Converter\CamelCasePropertyNameConverter;
 use MagicSunday\XmlMapper\Converter\PropertyNameConverterInterface;
 use MagicSunday\XmlMapper\Exception\CircularReferenceException;
 use MagicSunday\XmlMapper\Exception\InvalidXmlValueException;
+use MagicSunday\XmlMapper\Exception\UnmappableValueException;
 use MagicSunday\XmlSerializable;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
@@ -78,6 +82,7 @@ use PHPUnit\Framework\Attributes\UsesClass;
 use Symfony\Component\PropertyInfo\Extractor\PhpDocExtractor;
 use Symfony\Component\PropertyInfo\Extractor\ReflectionExtractor;
 use Symfony\Component\PropertyInfo\PropertyInfoExtractor;
+use Throwable;
 
 use function array_diff;
 use function array_map;
@@ -105,6 +110,7 @@ use const PHP_VERSION_ID;
 #[UsesClass(XmlIgnore::class)]
 #[UsesClass(CircularReferenceException::class)]
 #[UsesClass(InvalidXmlValueException::class)]
+#[UsesClass(UnmappableValueException::class)]
 class XmlEncoderTest extends TestCase
 {
     /**
@@ -550,6 +556,223 @@ class XmlEncoderTest extends TestCase
                 XML,
             (string) $this->getXmlEncoder()->map(new UnmarkedNested())
         );
+    }
+
+    /**
+     * A strict encoder refuses an array property that no type extractor
+     * recognised as a collection, where a lenient one writes an empty element.
+     */
+    #[Test]
+    public function strictModeRefusesAnArrayThatNoTypeExtractorResolves(): void
+    {
+        $extractor = new PropertyInfoExtractor(
+            [new ReflectionExtractor()],
+            [new PhpDocExtractor()]
+        );
+
+        $this->expectUnmappableValue('PlainArrayHost.tags', 'type array ', 'neither a scalar nor Stringable');
+
+        (new XmlEncoder($extractor, null, true))->map(new PlainArrayHost());
+    }
+
+    /**
+     * A strict encoder refuses a nested object that does not implement the
+     * marker, where a lenient one writes an empty element.
+     */
+    #[Test]
+    public function strictModeRefusesANestedObjectWithoutTheMarkerInterface(): void
+    {
+        $this->expectUnmappableValue('UnmarkedNested.inner', 'type class@anonymous ', 'neither a scalar nor Stringable');
+
+        $this->getXmlEncoder(true)->map(new UnmarkedNested());
+    }
+
+    /**
+     * A marker writes one scalar into one place, so a strict encoder refuses a
+     * collection that carries one, where a lenient one writes an empty value.
+     */
+    #[Test]
+    public function strictModeRefusesAMarkerOnACollection(): void
+    {
+        $this->expectUnmappableValue('MarkedCollectionHost.tags', 'type array ', 'neither a scalar nor Stringable');
+
+        $this->getXmlEncoder(true)->map(new MarkedCollectionHost());
+    }
+
+    /**
+     * A strict encoder refuses an empty array on a property that no type
+     * extractor resolved as well, because the shape is unmappable whatever it
+     * holds.
+     */
+    #[Test]
+    public function strictModeRefusesAnEmptyArrayThatNoTypeExtractorResolves(): void
+    {
+        $extractor = new PropertyInfoExtractor(
+            [new ReflectionExtractor()],
+            [new PhpDocExtractor()]
+        );
+
+        $host       = new PlainArrayHost();
+        $host->tags = [];
+
+        $this->expectUnmappableValue('PlainArrayHost.tags', 'type array ', 'neither a scalar nor Stringable');
+
+        (new XmlEncoder($extractor, null, true))->map($host);
+    }
+
+    /**
+     * The lenient default writes an empty value for a collection that carries a
+     * marker, so the entries are lost without any signal. Pinned as the
+     * counterpart of the strict refusal. It passes on code without the strict mode
+     * as well, so it guards the lenient output and is not a regression test of the
+     * refusal.
+     */
+    #[Test]
+    public function writesAnEmptyValueForAMarkerOnACollection(): void
+    {
+        self::assertXmlStringEqualsXmlString(
+            <<<'XML'
+                <?xml version="1.0" encoding="UTF-8"?>
+                <markedCollectionHost tags=""/>
+                XML,
+            (string) $this->getXmlEncoder()->map(new MarkedCollectionHost())
+        );
+    }
+
+    /**
+     * The type in the message comes from the value the converter returned, not
+     * from a fixed name, so an integer is reported as such.
+     */
+    #[Test]
+    public function strictModeNamesTheTypeOfWhatTheCollectionConverterReturned(): void
+    {
+        $encoder = $this->getXmlEncoder(true);
+
+        $encoder->addType(
+            'array',
+            static fn (string $name, array $value): int => 42
+        );
+
+        $this->expectUnmappableValue('PlainArrayHost.tags', 'type int ', 'cannot be iterated');
+
+        $encoder->map(new PlainArrayHost());
+    }
+
+    /**
+     * A strict encoder refuses a collection property whose converter returned
+     * something that cannot be iterated, where a lenient one drops the property.
+     */
+    #[Test]
+    public function strictModeRefusesACollectionConverterThatReturnsNoIterable(): void
+    {
+        $encoder = $this->getXmlEncoder(true);
+
+        $encoder->addType(
+            'array',
+            static fn (string $name, array $value): string => 'not iterable'
+        );
+
+        $this->expectUnmappableValue('PlainArrayHost.tags', 'type string ', 'cannot be iterated');
+
+        $encoder->map(new PlainArrayHost());
+    }
+
+    /**
+     * An object that cannot be iterated is no scalar either, so the refusal names
+     * its class and does not depend on the value being a scalar.
+     */
+    #[Test]
+    public function strictModeRefusesACollectionConverterThatReturnsANonIterableObject(): void
+    {
+        $encoder = $this->getXmlEncoder(true);
+
+        $encoder->addType(
+            'array',
+            static fn (string $name, array $value): object => new class {
+            }
+        );
+
+        $this->expectUnmappableValue('PlainArrayHost.tags', 'type class@anonymous ', 'cannot be iterated');
+
+        $encoder->map(new PlainArrayHost());
+    }
+
+    /**
+     * The lenient default drops the property when a collection converter returns
+     * something that cannot be iterated. Pinned as the counterpart of the strict
+     * refusal. It passes on code without the strict mode as well, so it guards
+     * the lenient output and is not a regression test of the refusal.
+     */
+    #[Test]
+    public function dropsAPropertyWhenACollectionConverterReturnsNoIterable(): void
+    {
+        $encoder = $this->getXmlEncoder();
+
+        $encoder->addType(
+            'array',
+            static fn (string $name, array $value): string => 'not iterable'
+        );
+
+        self::assertXmlStringEqualsXmlString(
+            <<<'XML'
+                <?xml version="1.0" encoding="UTF-8"?>
+                <plainArrayHost/>
+                XML,
+            (string) $encoder->map(new PlainArrayHost())
+        );
+    }
+
+    /**
+     * A null entry of a collection is an empty element in both modes, because a
+     * null stays empty and is not an unmappable value. It passes on code without
+     * the strict mode as well, so it guards that a null entry stays accepted and
+     * is not a regression test of the refusal.
+     */
+    #[Test]
+    public function strictModeAcceptsANullCollectionEntry(): void
+    {
+        $host = new NullableEntryCollectionHost();
+
+        $strict = (string) $this->getXmlEncoder(true)->map($host);
+
+        self::assertSame((string) $this->getXmlEncoder()->map($host), $strict);
+        self::assertStringContainsString('<tags/>', $strict);
+    }
+
+    /**
+     * A Stringable value is mappable, so a strict encoder writes it like a lenient
+     * one instead of refusing it as an object. It passes on code without the strict
+     * mode as well, so it guards the mappable path and is not a regression test of
+     * the refusal.
+     */
+    #[Test]
+    public function strictModeAcceptsAStringableValue(): void
+    {
+        $host             = new UnparseableValueHost();
+        $host->stringable = new PlainStringable();
+
+        $strict = (string) $this->getXmlEncoder(true)->map($host);
+
+        self::assertSame((string) $this->getXmlEncoder()->map($host), $strict);
+        self::assertStringContainsString('<stringable>plain</stringable>', $strict);
+    }
+
+    /**
+     * A strict encoder encodes everything it can map exactly like a lenient one,
+     * so switching it on changes nothing for a model without a silent drop. It
+     * passes on code without the strict mode as well, so it guards the mappable
+     * output and is not a regression test of the refusal.
+     */
+    #[Test]
+    public function strictModeEncodesEveryMappableValueAsBefore(): void
+    {
+        foreach ([new Person(), new Book()] as $instance) {
+            self::assertSame(
+                (string) $this->getXmlEncoder()->map($instance),
+                (string) $this->getXmlEncoder(true)->map($instance),
+                $instance::class . ' encodes differently in strict mode'
+            );
+        }
     }
 
     /**
@@ -1825,6 +2048,31 @@ class XmlEncoderTest extends TestCase
      */
     private function expectUnusableValue(string $path, string ...$details): void
     {
+        $this->expectRefusal(InvalidXmlValueException::class, $path, ...$details);
+    }
+
+    /**
+     * Expects the refusal of one value by a strict encoder, and that its message
+     * names the property path and carries each given detail.
+     *
+     * @param string $path       The property path the message must name
+     * @param string ...$details Text the message must contain
+     */
+    private function expectUnmappableValue(string $path, string ...$details): void
+    {
+        $this->expectRefusal(UnmappableValueException::class, $path, ...$details);
+    }
+
+    /**
+     * Expects the given exception, with a message that names the property path
+     * and carries each given detail.
+     *
+     * @param class-string<Throwable> $exception  The expected exception class
+     * @param string                  $path       The property path the message must name
+     * @param string                  ...$details Text the message must contain
+     */
+    private function expectRefusal(string $exception, string $path, string ...$details): void
+    {
         // PHPUnit keeps only the last message pattern it is given, so every
         // required fragment goes into one pattern as a lookahead.
         $pattern = '/' . implode(
@@ -1835,7 +2083,7 @@ class XmlEncoderTest extends TestCase
             )
         ) . '/s';
 
-        $this->expectException(InvalidXmlValueException::class);
+        $this->expectException($exception);
         $this->expectExceptionMessageMatches($pattern);
     }
 }

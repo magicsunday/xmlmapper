@@ -103,6 +103,16 @@ that redeclares an ignored property has to repeat `#[XmlIgnore]` on its own
 declaration, otherwise the redeclared property is encoded again. The other markers
 behave the same way.
 
+## A marker on a collection
+
+A marker writes one scalar into one place, so a property that holds a collection and
+carries `XmlAttribute`, `XmlNodeValue` or `XmlCDataSection` has nowhere to put its
+entries. The same holds for an object that is not `Stringable`, which a marker cannot
+write as text either. A lenient encoder, the default, writes an empty value and the
+entries are lost without any signal. A strict encoder throws `UnmappableValueException`
+instead, see [API reference](../API.md). Leave the marker off a collection, so that each
+entry becomes an element of its own.
+
 ## Notes
 
 - Apart from `XmlIgnore`, a property may carry at most one of these markers; the
