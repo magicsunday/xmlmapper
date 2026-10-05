@@ -128,12 +128,12 @@ class XmlEncoder
      *
      * @param PropertyInfoExtractorInterface      $extractor
      * @param PropertyNameConverterInterface|null $nameConverter A name converter instance
-     * @param bool                                $strict        Whether to refuse a value that cannot be mapped instead of dropping it silently
+     * @param bool                                $strict        Whether to refuse a value that cannot be mapped, which is the default, or to drop it silently
      */
     public function __construct(
         private readonly PropertyInfoExtractorInterface $extractor,
         private readonly ?PropertyNameConverterInterface $nameConverter = null,
-        private readonly bool $strict = false,
+        private readonly bool $strict = true,
     ) {
         $this->defaultType = new BuiltinType(TypeIdentifier::STRING);
     }

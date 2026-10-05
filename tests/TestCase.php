@@ -29,11 +29,11 @@ class TestCase extends \PHPUnit\Framework\TestCase
     /**
      * Returns an instance of the XmlEncoder for testing.
      *
-     * @param bool $strict Whether the encoder refuses a value it cannot map instead of dropping it
+     * @param bool $strict Whether the encoder refuses an unmappable value, as by default, or drops it
      *
      * @return XmlEncoder
      */
-    protected function getXmlEncoder(bool $strict = false): XmlEncoder
+    protected function getXmlEncoder(bool $strict = true): XmlEncoder
     {
         $listExtractors = [new ReflectionExtractor()];
         // Mirrors the configuration the README documents: PhpDocExtractor for

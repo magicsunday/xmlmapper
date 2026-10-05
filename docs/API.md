@@ -8,13 +8,13 @@ exceptions the encoder raises.
 
 Encodes a PHP object graph into an XML string.
 
-### `__construct(PropertyInfoExtractorInterface $extractor, ?PropertyNameConverterInterface $nameConverter = null, bool $strict = false)`
+### `__construct(PropertyInfoExtractorInterface $extractor, ?PropertyNameConverterInterface $nameConverter = null, bool $strict = true)`
 
 | Parameter        | Type                                          | Description                                                                 |
 |------------------|-----------------------------------------------|-----------------------------------------------------------------------------|
 | `$extractor`     | `Symfony\Component\PropertyInfo\PropertyInfoExtractorInterface` | Resolves the list of properties and each property's type.                   |
 | `$nameConverter` | `PropertyNameConverterInterface\|null`         | Optional. Converts class and property names into element names. Default `null` (raw names are used). |
-| `$strict`        | `bool`                                        | Optional. When `true`, `map()` throws `UnmappableValueException` for a value it cannot map instead of dropping it. Default `false`. |
+| `$strict`        | `bool`                                        | Optional. When `true`, `map()` throws `UnmappableValueException` for a value it cannot map instead of dropping it. Default `true`, pass `false` to drop such a value silently. |
 
 See [Manual instantiation](recipes/manual-instantiation.md) for how to wire the
 Symfony extractor.
@@ -25,7 +25,7 @@ Encodes `$instance` and returns the XML document as a string, or `false` if
 `DOMDocument::saveXML()` fails. May throw `DOMException` for invalid element
 names, `CircularReferenceException` for a cyclic object graph,
 `InvalidXmlValueException` for a value that XML 1.0 cannot carry and, from a strict
-encoder, `UnmappableValueException` for a value it cannot map.
+encoder, which is the default, `UnmappableValueException` for a value it cannot map.
 
 The root element is named after the object's short class name (passed through the
 name converter when one is configured). Properties with a `null` value are
@@ -34,9 +34,11 @@ properties, which are virtual properties declared with a `set` hook and no `get`
 hook. A static property is state of the class and not of the object, so it
 is never encoded.
 
-A lenient encoder, which is the default, drops a value it cannot map and gives no
-signal. An enum case, a closure or a resource is such a value wherever it is written as
-text. These are the cases that arise from the shape of the model:
+A strict encoder, which is the default, refuses a value it cannot map with
+`UnmappableValueException`, where a lenient encoder drops it and gives no signal. An
+enum case, a closure or a resource is such a value wherever it is written as text. These
+are the cases that arise from the shape of the model, each with what a lenient
+encoder does:
 
 - A nested object that implements neither `XmlSerializable` nor `Stringable` becomes an
   empty element.
@@ -50,11 +52,12 @@ text. These are the cases that arise from the shape of the model:
   iterated is left out. A closure that returns `null` leaves the property out like any
   other `null` value, in a lenient and in a strict encoder alike.
 
-A strict encoder (`new XmlEncoder($extractor, $nameConverter, true)`) throws
-`UnmappableValueException` in each of these cases instead, except for a `null` result,
-with a message that names the property path and the type of the value. A `Stringable`
-object is written as its text and a `null` entry of a collection stays an empty element,
-in both modes. Everything else is encoded exactly as by a lenient encoder.
+A strict encoder throws `UnmappableValueException` in each of these cases instead,
+except for a `null` result, with a message that names the property path and the type of
+the value. A `Stringable` object is written as its text and a `null` entry of a
+collection stays an empty element, in both modes. Everything else is encoded exactly as
+by a lenient encoder. To drop an unmappable value silently, create the encoder as
+`new XmlEncoder($extractor, $nameConverter, false)`.
 
 An object that is reached again while it is still being encoded, directly through
 one of its own properties or through other objects, would never finish encoding.
@@ -112,10 +115,10 @@ segment after the property whose closure runs it, for example `Node.wrap.Wrap.ne
 
 ## `MagicSunday\XmlMapper\Exception\UnmappableValueException`
 
-A `RuntimeException` that a strict encoder throws when it meets a value it cannot map,
-see the cases listed under `map()`. The message names the property path in the
-notation of `CircularReferenceException` and the type of the value, for example
-`Catalog.tags` and `array`. A lenient encoder never throws it.
+A `RuntimeException` that a strict encoder, which is the default, throws when it meets a
+value it cannot map, see the cases listed under `map()`. The message names the property
+path in the notation of `CircularReferenceException` and the type of the value, for
+example `Catalog.tags` and `array`. A lenient encoder never throws it.
 
 ## `MagicSunday\XmlMapper\Exception\InvalidXmlValueException`
 

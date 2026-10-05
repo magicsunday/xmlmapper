@@ -496,9 +496,10 @@ class XmlEncoderTest extends TestCase
      * An array property without a `@var` annotation is recognised as a
      * collection as long as a type extractor reads native types.
      *
-     * With only PhpDocExtractor the type resolves to nothing, falls back to
-     * string, and the entries are dropped into a single empty element without
-     * any error — which is why the documented configuration lists both.
+     * With only PhpDocExtractor the type resolves to nothing and falls back to
+     * string. A lenient encoder then writes a single empty element and loses the
+     * entries without any error, and the default encoder refuses the whole
+     * property, which is why the documented configuration lists both.
      */
     #[Test]
     public function encodesAnArrayPropertyWithoutADocblock(): void
@@ -516,9 +517,9 @@ class XmlEncoderTest extends TestCase
     }
 
     /**
-     * Only PhpDocExtractor: the same property loses its entries. Pinned so the
-     * cost of dropping ReflectionExtractor from the type extractors stays
-     * visible instead of surfacing as missing data in production.
+     * Only PhpDocExtractor in a lenient encoder. The same property loses its
+     * entries. Pinned so the cost of dropping ReflectionExtractor from the type
+     * extractors stays visible instead of surfacing as missing data in production.
      */
     #[Test]
     public function losesArrayEntriesWhenNoTypeExtractorReadsNativeTypes(): void
@@ -535,14 +536,15 @@ class XmlEncoderTest extends TestCase
                     <tags/>
                 </PlainArrayHost>
                 XML,
-            (string) (new XmlEncoder($extractor))->map(new PlainArrayHost())
+            (string) (new XmlEncoder($extractor, null, false))->map(new PlainArrayHost())
         );
     }
 
     /**
-     * A nested object that does not implement XmlSerializable renders as an
-     * empty element rather than raising anything. Pinned because it is the most
-     * likely mistake when adding a node type, and the symptom points nowhere.
+     * A lenient encoder renders a nested object that does not implement
+     * XmlSerializable as an empty element rather than raising anything. Pinned
+     * because it is the most likely mistake when adding a node type, and the
+     * symptom points nowhere.
      */
     #[Test]
     public function rendersANestedObjectWithoutTheMarkerInterfaceAsEmpty(): void
@@ -554,7 +556,7 @@ class XmlEncoderTest extends TestCase
                     <inner/>
                 </unmarkedNested>
                 XML,
-            (string) $this->getXmlEncoder()->map(new UnmarkedNested())
+            (string) $this->getXmlEncoder(false)->map(new UnmarkedNested())
         );
     }
 
@@ -573,6 +575,23 @@ class XmlEncoderTest extends TestCase
         $this->expectUnmappableValue('PlainArrayHost.tags', 'type array ', 'neither a scalar nor Stringable');
 
         (new XmlEncoder($extractor, null, true))->map(new PlainArrayHost());
+    }
+
+    /**
+     * An encoder built without the strict argument refuses an unmappable value,
+     * so dropping one silently has to be asked for with an explicit false.
+     */
+    #[Test]
+    public function refusesAnUnmappableValueByDefault(): void
+    {
+        $extractor = new PropertyInfoExtractor(
+            [new ReflectionExtractor()],
+            [new PhpDocExtractor()]
+        );
+
+        $this->expectUnmappableValue('PlainArrayHost.tags', 'type array ', 'neither a scalar nor Stringable');
+
+        (new XmlEncoder($extractor))->map(new PlainArrayHost());
     }
 
     /**
@@ -621,11 +640,11 @@ class XmlEncoderTest extends TestCase
     }
 
     /**
-     * The lenient default writes an empty value for a collection that carries a
-     * marker, so the entries are lost without any signal. Pinned as the
-     * counterpart of the strict refusal. It passes on code without the strict mode
-     * as well, so it guards the lenient output and is not a regression test of the
-     * refusal.
+     * A lenient encoder, which has to be asked for, writes an empty value for a
+     * collection that carries a marker, so the entries are lost without any
+     * signal. Pinned as the counterpart of the strict refusal. It passes on code
+     * without the strict mode as well, so it guards the lenient output and is not
+     * a regression test of the refusal.
      */
     #[Test]
     public function writesAnEmptyValueForAMarkerOnACollection(): void
@@ -635,7 +654,7 @@ class XmlEncoderTest extends TestCase
                 <?xml version="1.0" encoding="UTF-8"?>
                 <markedCollectionHost tags=""/>
                 XML,
-            (string) $this->getXmlEncoder()->map(new MarkedCollectionHost())
+            (string) $this->getXmlEncoder(false)->map(new MarkedCollectionHost())
         );
     }
 
@@ -698,15 +717,16 @@ class XmlEncoderTest extends TestCase
     }
 
     /**
-     * The lenient default drops the property when a collection converter returns
-     * something that cannot be iterated. Pinned as the counterpart of the strict
-     * refusal. It passes on code without the strict mode as well, so it guards
-     * the lenient output and is not a regression test of the refusal.
+     * A lenient encoder, which has to be asked for, drops the property when a
+     * collection converter returns something that cannot be iterated. Pinned as
+     * the counterpart of the strict refusal. It passes on code without the strict
+     * mode as well, so it guards the lenient output and is not a regression test
+     * of the refusal.
      */
     #[Test]
     public function dropsAPropertyWhenACollectionConverterReturnsNoIterable(): void
     {
-        $encoder = $this->getXmlEncoder();
+        $encoder = $this->getXmlEncoder(false);
 
         $encoder->addType(
             'array',
@@ -735,7 +755,7 @@ class XmlEncoderTest extends TestCase
 
         $strict = (string) $this->getXmlEncoder(true)->map($host);
 
-        self::assertSame((string) $this->getXmlEncoder()->map($host), $strict);
+        self::assertSame((string) $this->getXmlEncoder(false)->map($host), $strict);
         self::assertStringContainsString('<tags/>', $strict);
     }
 
@@ -753,13 +773,13 @@ class XmlEncoderTest extends TestCase
 
         $strict = (string) $this->getXmlEncoder(true)->map($host);
 
-        self::assertSame((string) $this->getXmlEncoder()->map($host), $strict);
+        self::assertSame((string) $this->getXmlEncoder(false)->map($host), $strict);
         self::assertStringContainsString('<stringable>plain</stringable>', $strict);
     }
 
     /**
      * A strict encoder encodes everything it can map exactly like a lenient one,
-     * so switching it on changes nothing for a model without a silent drop. It
+     * so the strict default changes nothing for a model without a silent drop. It
      * passes on code without the strict mode as well, so it guards the mappable
      * output and is not a regression test of the refusal.
      */
@@ -768,7 +788,7 @@ class XmlEncoderTest extends TestCase
     {
         foreach ([new Person(), new Book()] as $instance) {
             self::assertSame(
-                (string) $this->getXmlEncoder()->map($instance),
+                (string) $this->getXmlEncoder(false)->map($instance),
                 (string) $this->getXmlEncoder(true)->map($instance),
                 $instance::class . ' encodes differently in strict mode'
             );
@@ -1387,7 +1407,8 @@ class XmlEncoderTest extends TestCase
      * when the property is declared as that interface, because the lookup
      * compares names rather than walking the hierarchy. Pinned because it is
      * the one branch of the rule that prose alone was holding, and because the
-     * failure is silent — a miss yields an empty element, not an error.
+     * failure is silent in a lenient encoder, where a miss yields an empty element
+     * and not an error.
      */
     #[Test]
     public function appliesAClassKeyRegisteredUnderAnInterfaceToAnInterfaceTypedProperty(): void
@@ -1434,15 +1455,16 @@ class XmlEncoderTest extends TestCase
      * the hierarchy is not walked, and a collection is not unwrapped.
      *
      * Pinned because both are the obvious next thing a reader tries after the
-     * class-specific registration works, and both fail silently: the entry
-     * falls through to the scalar path, which yields an empty element.
+     * class-specific registration works, and both fail silently in a lenient
+     * encoder. The entry falls through to the scalar path, which yields an empty
+     * element, where a strict encoder refuses it.
      */
     #[Test]
     public function doesNotApplyAClassKeyToACollectionOfThatClass(): void
     {
         $host = new MoneyBag();
 
-        $xml = $this->getXmlEncoder()
+        $xml = $this->getXmlEncoder(false)
             ->addType(Money::class, static fn (string $name, array $value): string => 'converted')
             ->map($host);
 
@@ -1461,12 +1483,13 @@ class XmlEncoderTest extends TestCase
     /**
      * The class key is not resolved through the inheritance chain either: a
      * converter registered for the parent class does not fire for a property
-     * declared as a subclass, and the entry then renders as an empty element.
+     * declared as a subclass, and a lenient encoder then renders the entry as an
+     * empty element.
      */
     #[Test]
     public function doesNotApplyAClassKeyToASubclassProperty(): void
     {
-        $xml = $this->getXmlEncoder()
+        $xml = $this->getXmlEncoder(false)
             ->addType(Money::class, static fn (string $name, SpecialMoney $value): string => 'converted')
             ->map(new SpecialMoneyHost());
 
@@ -1762,10 +1785,11 @@ class XmlEncoderTest extends TestCase
      * The costly half of the collection boundary.
      *
      * A missed class key is harmless only while the class does not implement
-     * the marker interface — then the entry renders empty. Implement it, and the
-     * encoder walks the object instead, so a closure registered to redact or
-     * format a value silently emits the untouched contents. That is fail-open,
-     * and it is the shape a domain value object most plausibly has.
+     * the marker interface, where a lenient encoder renders the entry empty and
+     * the default strict one refuses it. Implement it, and the encoder walks the
+     * object instead, so a closure registered to redact or format a value
+     * silently emits the untouched contents. That is fail-open, and it is the
+     * shape a domain value object most plausibly has.
      */
     #[Test]
     public function walksTheEntriesWhenAMissedClassKeyMeetsTheMarkerInterface(): void

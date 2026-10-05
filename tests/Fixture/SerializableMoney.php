@@ -16,7 +16,8 @@ use MagicSunday\XmlSerializable;
 /**
  * Like the plain value object, but it implements the marker interface. That
  * single difference decides what a missed class key costs: without the marker a
- * missed entry renders empty, with it the encoder walks the object instead.
+ * missed entry renders empty in a lenient encoder and is refused by the default
+ * one, with it the encoder walks the object instead.
  *
  * @author  Rico Sonntag <mail@ricosonntag.de>
  * @license https://opensource.org/licenses/MIT

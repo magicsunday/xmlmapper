@@ -108,9 +108,9 @@ behave the same way.
 A marker writes one scalar into one place, so a property that holds a collection and
 carries `XmlAttribute`, `XmlNodeValue` or `XmlCDataSection` has nowhere to put its
 entries. The same holds for an object that is not `Stringable`, which a marker cannot
-write as text either. A lenient encoder, the default, writes an empty value and the
-entries are lost without any signal. A strict encoder throws `UnmappableValueException`
-instead, see [API reference](../API.md). Leave the marker off a collection, so that each
+write as text either. A strict encoder, the default, throws `UnmappableValueException`
+instead, see [API reference](../API.md). A lenient encoder writes an empty value and the
+entries are lost without any signal. Leave the marker off a collection, so that each
 entry becomes an element of its own.
 
 ## Notes

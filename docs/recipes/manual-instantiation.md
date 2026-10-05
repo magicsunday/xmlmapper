@@ -53,8 +53,9 @@ $encoder = new XmlEncoder($extractor, new CamelCasePropertyNameConverter());
   annotations such as `@var Chapter[]`; the `ReflectionExtractor` also contributes
   native property types. Listing both matters: with only `PhpDocExtractor`, an
   array property that carries no `@var` annotation resolves to no type at all,
-  falls back to `string`, and is then rendered as a single empty element. A lenient
-  encoder drops its entries without any error, and a strict one refuses them.
+  falls back to `string`, and is then a value no encoder can map. A strict encoder, the
+  default, refuses the whole property, and a lenient one renders a single empty element
+  and loses the entries without any error.
 
   The same change also moves the **custom-type lookup key**. A natively typed
   property that used to resolve to no type fell back to `string` and matched a
