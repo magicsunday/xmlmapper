@@ -17,6 +17,7 @@ use DOMException;
 use Exception;
 use LogicException;
 use MagicSunday\Test\Fixture\Author;
+use MagicSunday\Test\Fixture\BackedGetHookHost;
 use MagicSunday\Test\Fixture\BodyHost;
 use MagicSunday\Test\Fixture\Book;
 use MagicSunday\Test\Fixture\Chapter;
@@ -875,6 +876,27 @@ class XmlEncoderTest extends TestCase
                 </writeOnlyVirtualHost>
                 XML,
             (string) $this->getXmlEncoder()->map($host)
+        );
+    }
+
+    /**
+     * A property that has a stored value and a get hook is encoded with the value
+     * its get hook returns, not with the stored one, because the encoder reads a
+     * property through reflection the way the language does. It passes on the code
+     * before this test existed, so it pins the behaviour and is not a regression
+     * test of a fix.
+     */
+    #[Test]
+    public function encodesTheValueOfTheGetHookOfABackedProperty(): void
+    {
+        self::assertXmlStringEqualsXmlString(
+            <<<'XML'
+                <?xml version="1.0" encoding="UTF-8"?>
+                <backedGetHookHost>
+                    <title>STORED</title>
+                </backedGetHookHost>
+                XML,
+            (string) $this->getXmlEncoder()->map(new BackedGetHookHost())
         );
     }
 
