@@ -37,8 +37,8 @@ is never encoded.
 A strict encoder, which is the default, refuses a value it cannot map with
 `UnmappableValueException`, where a lenient encoder drops it and gives no signal. An
 enum case, a closure or a resource is such a value wherever it is written as text. These
-are the cases that arise from the shape of the model, with what a lenient encoder does
-in each:
+are the cases that arise from the shape of the model, each with what a lenient
+encoder does:
 
 - A nested object that implements neither `XmlSerializable` nor `Stringable` becomes an
   empty element.
@@ -52,11 +52,11 @@ in each:
   iterated is left out. A closure that returns `null` leaves the property out like any
   other `null` value, in a lenient and in a strict encoder alike.
 
-A strict encoder throws `UnmappableValueException` in each of these cases instead, except for a `null` result,
-with a message that names the property path and the type of the value. A `Stringable`
-object is written as its text and a `null` entry of a collection stays an empty element,
-in both modes. Everything else is encoded exactly as by a lenient encoder. To drop an
-unmappable value silently, create the encoder as
+A strict encoder throws `UnmappableValueException` in each of these cases instead,
+except for a `null` result, with a message that names the property path and the type of
+the value. A `Stringable` object is written as its text and a `null` entry of a
+collection stays an empty element, in both modes. Everything else is encoded exactly as
+by a lenient encoder. To drop an unmappable value silently, create the encoder as
 `new XmlEncoder($extractor, $nameConverter, false)`.
 
 An object that is reached again while it is still being encoded, directly through
@@ -116,10 +116,9 @@ segment after the property whose closure runs it, for example `Node.wrap.Wrap.ne
 ## `MagicSunday\XmlMapper\Exception\UnmappableValueException`
 
 A `RuntimeException` that a strict encoder, which is the default, throws when it meets a
-value it cannot map,
-see the cases listed under `map()`. The message names the property path in the
-notation of `CircularReferenceException` and the type of the value, for example
-`Catalog.tags` and `array`. A lenient encoder never throws it.
+value it cannot map, see the cases listed under `map()`. The message names the property
+path in the notation of `CircularReferenceException` and the type of the value, for
+example `Catalog.tags` and `array`. A lenient encoder never throws it.
 
 ## `MagicSunday\XmlMapper\Exception\InvalidXmlValueException`
 

@@ -29,7 +29,7 @@ class TestCase extends \PHPUnit\Framework\TestCase
     /**
      * Returns an instance of the XmlEncoder for testing.
      *
-     * @param bool $strict Whether the encoder refuses a value it cannot map, which is the library default, or drops it
+     * @param bool $strict Whether the encoder refuses an unmappable value, as by default, or drops it
      *
      * @return XmlEncoder
      */
