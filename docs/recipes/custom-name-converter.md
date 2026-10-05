@@ -20,6 +20,9 @@ once per property name.
 `CamelCasePropertyNameConverter` turns snake_case into camelCase using Doctrine's
 inflector, so `home_town` becomes `homeTown` and a class `Person` becomes `person`.
 
+The class is `final` and read-only, so it cannot be extended. To change the
+behaviour, implement the interface as shown below.
+
 ```php
 use MagicSunday\XmlMapper\Converter\CamelCasePropertyNameConverter;
 

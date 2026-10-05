@@ -15,18 +15,18 @@ use Doctrine\Inflector\Inflector;
 use Doctrine\Inflector\InflectorFactory;
 
 /**
- * This name converter converts a property name into a camelized property name.
+ * This name converter converts a class or property name into a camelized name.
  *
  * @author  Rico Sonntag <mail@ricosonntag.de>
  * @license https://opensource.org/licenses/MIT
  * @link    https://github.com/magicsunday/xmlmapper/
  */
-class CamelCasePropertyNameConverter implements PropertyNameConverterInterface
+final readonly class CamelCasePropertyNameConverter implements PropertyNameConverterInterface
 {
     /**
      * The inflector that performs the camel-case conversion.
      */
-    private readonly Inflector $inflector;
+    private Inflector $inflector;
 
     /**
      * Constructor.
@@ -37,11 +37,11 @@ class CamelCasePropertyNameConverter implements PropertyNameConverterInterface
     }
 
     /**
-     * Converts the specified property name to another format.
+     * Converts the specified class or property name to camel case.
      *
-     * @param string $name
+     * @param string $name The class or property name, where underscores, hyphens and spaces separate words
      *
-     * @return string
+     * @return string The name in camel case
      */
     public function convert(string $name): string
     {

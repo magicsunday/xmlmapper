@@ -80,6 +80,7 @@ use MagicSunday\XmlMapper\Exception\UnmappableValueException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\Attributes\UsesClass;
+use ReflectionProperty;
 use Symfony\Component\PropertyInfo\Extractor\PhpDocExtractor;
 use Symfony\Component\PropertyInfo\Extractor\ReflectionExtractor;
 use Symfony\Component\PropertyInfo\PropertyInfoExtractor;
@@ -2042,6 +2043,22 @@ class XmlEncoderTest extends TestCase
     private function expectUnmappableValue(string $path, string ...$details): void
     {
         $this->expectRefusal(UnmappableValueException::class, $path, ...$details);
+    }
+
+    /**
+     * Tests that the name converter is private and read-only state, like every
+     * other constructor dependency of the encoder, so a subclass cannot replace it.
+     *
+     * Reads state only. It fails on the code before the change, where the
+     * property was protected and writable.
+     */
+    #[Test]
+    public function keepsTheNameConverterPrivateAndReadOnly(): void
+    {
+        $property = new ReflectionProperty(XmlEncoder::class, 'nameConverter');
+
+        self::assertTrue($property->isPrivate());
+        self::assertTrue($property->isReadOnly());
     }
 
     /**
