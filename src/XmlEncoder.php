@@ -41,11 +41,9 @@ use function array_key_exists;
 use function array_pop;
 use function get_debug_type;
 use function implode;
-use function is_array;
 use function is_bool;
 use function is_iterable;
 use function is_scalar;
-use function method_exists;
 use function preg_match;
 use function spl_object_id;
 use function str_replace;
@@ -431,20 +429,8 @@ class XmlEncoder
      */
     private function isWriteOnly(ReflectionProperty $property): bool
     {
-        // Neither property hooks nor the reflection of them exist below PHP 8.4,
-        // and no class can declare such a property there.
-        if (
-            !method_exists($property, 'isVirtual')
-            || !method_exists($property, 'getHooks')
-        ) {
-            return false;
-        }
-
-        $hooks = $property->getHooks();
-
-        return ($property->isVirtual() === true)
-            && is_array($hooks)
-            && !array_key_exists('get', $hooks);
+        return $property->isVirtual()
+            && !array_key_exists('get', $property->getHooks());
     }
 
     /**

@@ -65,6 +65,7 @@ use MagicSunday\Test\Fixture\UnmarkedNested;
 use MagicSunday\Test\Fixture\UnparseableStringable;
 use MagicSunday\Test\Fixture\UnparseableValueHost;
 use MagicSunday\Test\Fixture\VisibilityHost;
+use MagicSunday\Test\Fixture\WriteOnlyVirtualHost;
 use MagicSunday\XmlEncoder;
 use MagicSunday\XmlMapper\Annotation\XmlAttribute;
 use MagicSunday\XmlMapper\Annotation\XmlCDataSection;
@@ -75,7 +76,6 @@ use MagicSunday\XmlMapper\Converter\PropertyNameConverterInterface;
 use MagicSunday\XmlMapper\Exception\CircularReferenceException;
 use MagicSunday\XmlMapper\Exception\InvalidXmlValueException;
 use MagicSunday\XmlMapper\Exception\UnmappableValueException;
-use MagicSunday\XmlSerializable;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\Attributes\UsesClass;
@@ -92,8 +92,6 @@ use function chr;
 use function implode;
 use function preg_quote;
 use function range;
-
-use const PHP_VERSION_ID;
 
 /**
  * Behavioural characterization tests pinning the XML output produced by the encoder.
@@ -860,51 +858,12 @@ class XmlEncoderTest extends TestCase
      * initialized, so the uninitialized guard lets it through, and reading it
      * raises a native Error. Its neighbours stay encoded: a property that has a
      * set hook but is backed by a value, and a virtual property that also has a
-     * get hook, are both readable. Property hooks are a syntax error below PHP 8.4,
-     * which is why the class is declared at run time and only where the syntax
-     * is available, instead of living in a fixture file the lint step would
-     * parse on every supported version.
+     * get hook, are both readable.
      */
     #[Test]
     public function skipsAWriteOnlyVirtualProperty(): void
     {
-        if (PHP_VERSION_ID < 80400) {
-            self::markTestSkipped('Property hooks need PHP 8.4 or later.');
-        }
-
-        $host = eval(
-            <<<'PHP'
-                namespace MagicSunday\Test\Fixture;
-
-                use function class_exists;
-
-                if (!class_exists(WriteOnlyVirtualHost::class, false)) {
-                    final class WriteOnlyVirtualHost implements \MagicSunday\XmlSerializable
-                    {
-                        public string $filled = 'value';
-
-                        public string $sinkOnly {
-                            set {
-                            }
-                        }
-
-                        public string $backed = 'kept' {
-                            set => $value;
-                        }
-
-                        public string $readable {
-                            get => 'read';
-                            set {
-                            }
-                        }
-                    }
-                }
-
-                return new WriteOnlyVirtualHost();
-                PHP
-        );
-
-        self::assertInstanceOf(XmlSerializable::class, $host);
+        $host = new WriteOnlyVirtualHost();
 
         self::assertXmlStringEqualsXmlString(
             <<<'XML'
