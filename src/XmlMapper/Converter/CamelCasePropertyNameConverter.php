@@ -39,7 +39,7 @@ final readonly class CamelCasePropertyNameConverter implements PropertyNameConve
     /**
      * Converts the specified property name to another format.
      *
-     * @param string $name The property name, with words separated by underscores, hyphens or spaces
+     * @param string $name The class or property name, where underscores, hyphens and spaces separate words
      *
      * @return string The property name in camel case
      */
