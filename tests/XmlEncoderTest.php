@@ -516,9 +516,9 @@ class XmlEncoderTest extends TestCase
     }
 
     /**
-     * Only PhpDocExtractor: the same property loses its entries. Pinned so the
-     * cost of dropping ReflectionExtractor from the type extractors stays
-     * visible instead of surfacing as missing data in production.
+     * Only PhpDocExtractor in a lenient encoder: the same property loses its
+     * entries. Pinned so the cost of dropping ReflectionExtractor from the type
+     * extractors stays visible instead of surfacing as missing data in production.
      */
     #[Test]
     public function losesArrayEntriesWhenNoTypeExtractorReadsNativeTypes(): void
@@ -535,14 +535,15 @@ class XmlEncoderTest extends TestCase
                     <tags/>
                 </PlainArrayHost>
                 XML,
-            (string) (new XmlEncoder($extractor))->map(new PlainArrayHost())
+            (string) (new XmlEncoder($extractor, null, false))->map(new PlainArrayHost())
         );
     }
 
     /**
-     * A nested object that does not implement XmlSerializable renders as an
-     * empty element rather than raising anything. Pinned because it is the most
-     * likely mistake when adding a node type, and the symptom points nowhere.
+     * A lenient encoder renders a nested object that does not implement
+     * XmlSerializable as an empty element rather than raising anything. Pinned
+     * because it is the most likely mistake when adding a node type, and the
+     * symptom points nowhere.
      */
     #[Test]
     public function rendersANestedObjectWithoutTheMarkerInterfaceAsEmpty(): void
@@ -554,7 +555,7 @@ class XmlEncoderTest extends TestCase
                     <inner/>
                 </unmarkedNested>
                 XML,
-            (string) $this->getXmlEncoder()->map(new UnmarkedNested())
+            (string) $this->getXmlEncoder(false)->map(new UnmarkedNested())
         );
     }
 
@@ -573,6 +574,23 @@ class XmlEncoderTest extends TestCase
         $this->expectUnmappableValue('PlainArrayHost.tags', 'type array ', 'neither a scalar nor Stringable');
 
         (new XmlEncoder($extractor, null, true))->map(new PlainArrayHost());
+    }
+
+    /**
+     * An encoder built without the strict argument refuses an unmappable value,
+     * so dropping one silently has to be asked for with an explicit false.
+     */
+    #[Test]
+    public function refusesAnUnmappableValueByDefault(): void
+    {
+        $extractor = new PropertyInfoExtractor(
+            [new ReflectionExtractor()],
+            [new PhpDocExtractor()]
+        );
+
+        $this->expectUnmappableValue('PlainArrayHost.tags', 'type array ', 'neither a scalar nor Stringable');
+
+        (new XmlEncoder($extractor))->map(new PlainArrayHost());
     }
 
     /**
@@ -621,9 +639,9 @@ class XmlEncoderTest extends TestCase
     }
 
     /**
-     * The lenient default writes an empty value for a collection that carries a
-     * marker, so the entries are lost without any signal. Pinned as the
-     * counterpart of the strict refusal. It passes on code without the strict mode
+     * A lenient encoder, which has to be asked for, writes an empty value for a
+     * collection that carries a marker, so the entries are lost without any
+     * signal. Pinned as the counterpart of the strict refusal. It passes on code without the strict mode
      * as well, so it guards the lenient output and is not a regression test of the
      * refusal.
      */
@@ -635,7 +653,7 @@ class XmlEncoderTest extends TestCase
                 <?xml version="1.0" encoding="UTF-8"?>
                 <markedCollectionHost tags=""/>
                 XML,
-            (string) $this->getXmlEncoder()->map(new MarkedCollectionHost())
+            (string) $this->getXmlEncoder(false)->map(new MarkedCollectionHost())
         );
     }
 
@@ -698,15 +716,15 @@ class XmlEncoderTest extends TestCase
     }
 
     /**
-     * The lenient default drops the property when a collection converter returns
-     * something that cannot be iterated. Pinned as the counterpart of the strict
-     * refusal. It passes on code without the strict mode as well, so it guards
+     * A lenient encoder, which has to be asked for, drops the property when a
+     * collection converter returns something that cannot be iterated. Pinned as
+     * the counterpart of the strict refusal. It passes on code without the strict mode as well, so it guards
      * the lenient output and is not a regression test of the refusal.
      */
     #[Test]
     public function dropsAPropertyWhenACollectionConverterReturnsNoIterable(): void
     {
-        $encoder = $this->getXmlEncoder();
+        $encoder = $this->getXmlEncoder(false);
 
         $encoder->addType(
             'array',
@@ -735,7 +753,7 @@ class XmlEncoderTest extends TestCase
 
         $strict = (string) $this->getXmlEncoder(true)->map($host);
 
-        self::assertSame((string) $this->getXmlEncoder()->map($host), $strict);
+        self::assertSame((string) $this->getXmlEncoder(false)->map($host), $strict);
         self::assertStringContainsString('<tags/>', $strict);
     }
 
@@ -753,7 +771,7 @@ class XmlEncoderTest extends TestCase
 
         $strict = (string) $this->getXmlEncoder(true)->map($host);
 
-        self::assertSame((string) $this->getXmlEncoder()->map($host), $strict);
+        self::assertSame((string) $this->getXmlEncoder(false)->map($host), $strict);
         self::assertStringContainsString('<stringable>plain</stringable>', $strict);
     }
 
@@ -768,7 +786,7 @@ class XmlEncoderTest extends TestCase
     {
         foreach ([new Person(), new Book()] as $instance) {
             self::assertSame(
-                (string) $this->getXmlEncoder()->map($instance),
+                (string) $this->getXmlEncoder(false)->map($instance),
                 (string) $this->getXmlEncoder(true)->map($instance),
                 $instance::class . ' encodes differently in strict mode'
             );
@@ -1442,7 +1460,7 @@ class XmlEncoderTest extends TestCase
     {
         $host = new MoneyBag();
 
-        $xml = $this->getXmlEncoder()
+        $xml = $this->getXmlEncoder(false)
             ->addType(Money::class, static fn (string $name, array $value): string => 'converted')
             ->map($host);
 
@@ -1466,7 +1484,7 @@ class XmlEncoderTest extends TestCase
     #[Test]
     public function doesNotApplyAClassKeyToASubclassProperty(): void
     {
-        $xml = $this->getXmlEncoder()
+        $xml = $this->getXmlEncoder(false)
             ->addType(Money::class, static fn (string $name, SpecialMoney $value): string => 'converted')
             ->map(new SpecialMoneyHost());
 

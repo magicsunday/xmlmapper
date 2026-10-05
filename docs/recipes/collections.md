@@ -40,8 +40,8 @@ A populated book yields one element per entry:
 
 The object-versus-scalar decision is made from the **runtime value**: an entry that
 implements `XmlSerializable` is encoded recursively, a scalar or `Stringable` entry
-as a scalar element. Any other entry, except `null`, becomes an empty element in a
-lenient encoder and is refused by a strict one, see the [API reference](../API.md). A
+as a scalar element. Any other entry, except `null`, is refused by a strict encoder, the default, and becomes
+an empty element in a lenient one, see the [API reference](../API.md). A
 `null` entry stays an empty element in both.
 
 ## Nullable collections

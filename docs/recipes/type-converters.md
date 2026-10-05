@@ -70,8 +70,8 @@ resolved through the inheritance chain, so a converter registered for a parent
 class does not fire for a property declared as a subclass. A collection of
 that class (`@var Money[]`) likewise resolves to the builtin key `array`, so the class
 closure is not applied per entry. Because `Money` does not implement
-`XmlSerializable`, a lenient encoder renders each entry as an empty element without
-an error, and a strict one refuses it.
+`XmlSerializable`, a strict encoder, the default, refuses each entry, and a lenient one
+renders it as an empty element without an error.
 
 If the class **does** implement `XmlSerializable`, a missed class key is not
 harmless: the encoder walks the object and writes out every property the
