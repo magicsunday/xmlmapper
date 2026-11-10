@@ -3,6 +3,7 @@
 # part of the Composer dist archive and ends up inside the consumer's vendor directory.
 /.build                     export-ignore
 /.github                    export-ignore
+/renovate.json              export-ignore
 /tests                      export-ignore
 /.editorconfig              export-ignore
 /.gitattributes             export-ignore
