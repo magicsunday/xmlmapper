@@ -57,12 +57,18 @@ XmlSerializable (marker interface)
 - **Unmappable values are refused, and dropped only by a lenient encoder.** A lenient encoder, `false` as the third constructor argument, makes `encodeValue()` return `''` for anything neither scalar nor `Stringable`, and `encodeCollection()` leave out a collection value that cannot be iterated. The default, a strict encoder, throws `UnmappableValueException` at exactly those two places instead, and a `null` stays empty in both modes. A string XML 1.0 cannot carry is refused in both modes, because it would make the whole document unparseable. `encodeValue()` hands every string it produces to `assertWritableText()`, which throws `InvalidXmlValueException`, so a new write path must stringify through `encodeValue()` or it bypasses the check.
 - **A cycle is detected on the active path, not on everything seen.** `encodeObject()` keeps the objects it is currently inside, keyed by object id, and throws when it meets one of them again. The same instance on another branch has finished by then and is encoded in full, so a seen-before set would reject a valid graph. A nested `map()` call keeps the set, because a cycle that runs through a closure calling `map()` again must be found too, and the entry position in the path is counted, not read from the keys, so an iterator is never asked for them.
 
-<!-- testing-policy:begin v1 -->
+<!-- testing-policy:begin v2 -->
 ## Testing policy
 
 Tests protect behavior whose regression would be materially incorrect, unsafe,
 destructive or hard to notice before release. They are not a coverage target and
 they are not a mutation-score target.
+
+This block decides which behavior needs testing, even when a repository rule
+requires tests for every change. Repository rules about test-first work or
+positive and negative tests still apply when this block requires a test, but
+they do not require tests excluded by the "Do not add tests whose only content
+is" list.
 
 Protect these with durable tests:
 - security and privacy boundaries, including untrusted data reaching a path,
@@ -77,16 +83,19 @@ Protect these with durable tests:
   persisted configuration keys, producer and consumer contracts
 - every fixed behavioral bug (some test must fail on the old behavior). A bug
   that is only a wrong label, CSS class or default is not behavioral unless a
-  named consumer breaks on it.
+  named consumer breaks on it or it breaks a security, privacy or accessibility
+  property.
 
-For side effects assert the postcondition and the identity of the affected
-resource, not only that a collaborator was called.
+For side effects, assert the observable result and the identity of the affected
+resource. For external calls, assert the destination and the relevant payload,
+not only that a collaborator was called.
 
 Do not add tests whose only content is:
 - a getter, setter, constructor that only stores values, DTO, enum or constant,
   unless it carries a persisted key or a serialized format from the list above
 - a CSS class list, a label or message text, or a default value, unless the exact
-  value is a documented interface that a named consumer breaks on. Prefer testing
+  value is a documented interface that a named consumer breaks on or it encodes a
+  security, privacy or accessibility property. Prefer testing
   the consuming behavior over the producer literal and pin only the minimum literal.
 - transparent delegation that adds no argument selection, ordering, error
   translation or security context
